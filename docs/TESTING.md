@@ -1,23 +1,33 @@
 # Testing
 
-## Existing, verified functionality
+## Verified status
 
-No executable suite, test scripts, compiler configuration or app exists. No runtime/build/accessibility/performance tests have passed. Audit checks were inventory, tracked files, status/history, .gitattributes and README/AGENTS presence. See README for scope.
+No application, suite, runner, scripts, compiler configuration or CI exists. No runtime/API/build/accessibility/security/performance test has run. Documentation checks do not prove functioning software. Choose tooling after architecture approval; do not install dependencies for this task.
 
-## Proposed functionality
+## Proposed acceptance coverage
 
-- Domain: timestamp/local-date interpretation, missing versus zero, validation, duplicates, rule boundaries/denominators and recomputation.
-- API/database: cross-user list/read/edit/delete/export denial, expired sessions, CSRF where applicable, transactions, pagination, optimistic conflicts and idempotency.
-- Browser: onboarding, consent, log/save/reload/edit/delete, journal, optional cycle, summary/export and deletion progress.
-- Accessibility: automated checks plus keyboard, screen reader, zoom, dialogs, chart/table equivalence, mobile and reduced motion.
-- Safety: descriptive wording, sparse-data behavior, source provenance, reviewed content and fact/observation separation.
-- Operations: migrations, backup restore, export expiry, deletion propagation and log redaction.
-- Performance: measure proposed FRONTEND targets on representative mobile hardware/networks.
+| Area | Scenarios and required outcome |
+| --- | --- |
+| Mind & Wellness | Optional mood/energy/stress/sleep, journal save/reload/edit/delete, coverage visuals and reminders; journal private by default |
+| AI Assistant | Genuine sources, unsupported questions, scoped context, revoked grants, vendor outage, malicious report instructions and deletion; no fabricated citations/findings, diagnosis or prescribing |
+| Appointments & Clinic | Directory provenance/verification, filters/no results, demo labels, requests/history/cancel/reminders, duplicate callbacks/outage; only provider evidence confirms booking |
+| Period Tracker | Open/start/end/overlapping dates, timezone, optional fields, calendar keyboard use, selected export and edit/delete; labeled estimates and no fertility/contraceptive promise |
+| Sisterhood | Pseudonyms/topics/posts/comments/reactions/bookmarks/search, reporting/blocking/spam/moderation/appeals; no private joins, fields, attachments, prefill or search leakage |
+| Women's Health Library | All life-stage categories, search/navigation, references/reviewer role/status/date/revisions, broken/stale sources and accessible media; no unreviewed medical-review label |
+| PCOS Insights | Selected history, reported versus confirmed facts, missing/sparse/irregular data, coverage/provenance/review/export; no unvalidated PCOS percentage/probability, diagnosis or exclusion from absent symptoms |
+| Cross-module | Period Tracker → library → scoped AI → PCOS summary → review/edit → recipient-specific clinic sharing; separate journal/community retain boundaries |
+| Authentication/authorization | Unauthenticated/expired sessions, cross-user list/read/edit/delete/download/export/jobs, role access, revocation and CSRF where applicable; denial without existence leaks |
+| Consent | Refusal/withdrawal, selected IDs/versions, distinct purposes/recipients, changed payload and queued dispatch; revoke before execution and require approval again for changed content |
+| Reports | Invalid type/size/malware, object ownership, OCR/unit/contradiction errors, correction/review/deletion; draft findings cannot become confirmed without user review, which is not diagnosis |
+| Lifecycle | Missing versus zero, duplicate/concurrent edits, canonical references, stale summary after edit/delete, export expiry, processor deletion and backup tombstones; truthful status |
+| API/errors | Schemas/enums/lengths/ranges, ownership, pagination, rate limits, idempotency, conflicts and integration failures; safe stable errors, no false success |
+| Accessibility/responsive | Automated plus keyboard/screen reader/contrast/focus/dialogs/zoom/reflow, chart-table equivalence, calendars, touch/mobile/reduced motion; evaluate WCAG 2.2 AA goals |
+| Operations/performance | Slow mobile networks, proposed frontend budgets, compatible migration, restore/rollback, alerts, safe logging, secret/dependency review and incident exercise |
 
-Use synthetic fixtures only. A real-user release requires persistence across reload and owner isolation demonstrated end to end. Select runners after stack approval.
+Use synthetic fixtures: two owners, a moderator without health access, sparse cycles, draft/corrected reports, stale summaries, withdrawn grants and unconfirmed bookings. Verify service/storage denial as well as UI; hiding controls is not authorization. Establish clinical/accessibility reviewers and measurable thresholds before real-user launch.
 
-Documentation validation: required files, internal links, verified/proposed/decision sections, consistent claims and whitespace. These checks do not prove product functionality.
+## Documentation validation
 
-## Decisions still needed
+Check local Markdown links, seven canonical module names, exact five palette values, evidence-backed stack/status wording, consistent equivalent files, privacy/consent, no PCOS diagnostic score, no automatic community disclosure and user review before extracted findings are relied on. Check Git whitespace/diff and Markdown-only changes. This does not establish clinical efficacy, compliance or runtime behavior.
 
-Test tooling, browser matrix, CI environment, clinical/accessibility reviewers, coverage expectations and launch thresholds.
+Open: tooling, browser/CI matrix, reviewers, quantitative thresholds and incident evaluation. See [Roadmap](PIPELINE.md).

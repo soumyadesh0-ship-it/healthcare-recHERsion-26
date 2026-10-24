@@ -1,26 +1,39 @@
 # Security and privacy
 
-## Existing, verified functionality
+## Verified status
 
-No data collection, authentication, consent, encryption configuration, privacy policy or security tests exist. Compliance is not established.
+No authentication, authorization, data collection, consent system, encryption configuration, secure storage, backup or security test exists. Requirements below are proposed. No compliance or certification is established.
 
-## Proposed functionality
+## Access, consent and isolation
 
-Treat symptom/cycle/journal information as sensitive. Minimize collection and specify purpose per field. No advertising trackers, session replay or health payload analytics in private views.
+Authenticate with a reviewed session lifecycle; authorize ownership/role/purpose server-side on each request and queued job. Derive owner from session. Shared identity/navigation does not grant universal health access. Use least privilege for services/staff/processors, session expiry/revocation, secure HttpOnly cookies where appropriate and CSRF/origin controls.
 
-| Threat | Required control |
+Purpose-specific consent identifies selected records/versions, processing purpose, recipient and policy version. Optional uses can be refused/withdrawn. AI processing, summarization and clinician delivery are separate permissions; changed payloads need renewed approval. Show grants and sharing history. Journals remain private by default and cannot be disclosed to clinicians/community without explicit consent and action. Sisterhood offers no automatic private-record sharing path, including through existing AI/clinic permissions.
+
+Community services/search/moderators cannot access period history, PCOS information, reports, journals, appointment summaries or AI conversations. Separate community IDs with restricted internal account linkage. No composer prefill, private attachments, private-history topic inference or health details in profiles. Pseudonymity is not complete anonymity: account/network metadata, volunteered details and screenshots can identify users. Reporting/blocking, anti-spam and harassment/doxxing/misinformation procedures require real tools/staff before launch.
+
+## Required controls
+
+| Area | Requirement, not implemented |
 | --- | --- |
-| Cross-user access | Server-derived identity, owner-scoped queries, denial tests for every operation/export |
-| Session theft/CSRF | Managed authentication, secure HttpOnly cookies where appropriate, expiry/revocation and origin/CSRF controls |
-| Injection/XSS | Server validation, parameterized queries, safe text rendering and reviewed sanitization |
-| Accidental disclosure | Private cache policies; no health details in URLs/logs/errors; synthetic development data |
-| Storage/export exposure | TLS, reviewed encryption at rest/key access, private database, expiring protected downloads and cleanup |
-| Operational loss | Encrypted backups, restore tests, incident owner and credential rotation |
+| Minimization | Purpose per field, optional logs, minimal identity; no unnecessary address/birth/anatomy collection |
+| Transport/storage | HTTPS/TLS, reviewed encryption at rest/key permissions, private data/storage and expiring owner-authorized downloads |
+| Files | Type/size validation, quarantine/malware checks, extraction isolation, protected objects and user review before reliance |
+| Injection/abuse | Server validation, parameterized access, safe rendering/sanitization, rate limits and signed/replay-protected provider callbacks |
+| Caches/logs | Private/no-store health responses; no health text in URLs, logs, errors, analytics, crash reports or session replay; minimal restricted audit metadata |
+| Secrets | Server-only secret management, rotation and isolated environments; future templates use placeholders only |
+| Operations | Restricted audited admin/support access, encrypted backups, restore exercises and incident owners |
 
-Separate required service purposes from optional analytics/communications; record purpose and policy version, support withdrawal. User controls cover access, correction, export and deletion. Define propagation to observations, exports, processors and backups, with truthful completion timing and justified retention exceptions. Downloaded copies remain under user control.
+No advertising trackers/session replay in private routes. Vendors receive only authorized minimum data after processor/retention/training/deletion review. Opt-in reminder bodies remain neutral, including on lock screens.
 
-Future secret templates contain placeholders only; server secrets never enter browser bundles or Git. Limit administrative access and retain audit metadata without copying health text.
+## Correction, retention and deletion
 
-## Decisions still needed
+Support access, correction, selected export and deletion with visible lifecycle status. Source changes invalidate affected derived summaries. Remove eligible files/findings/indices/conversations/pending jobs/exports. Revocation prevents future access but cannot undo downloaded/delivered copies; disclose before sharing.
 
-Jurisdiction, legal basis/obligations, age policy, controller/processors, residency, retention, backup expiry, recovery, incident response and reviewed privacy notice. This plan is not a compliance declaration.
+Define per-entity retention/justified exceptions before collection, including community authorship/moderation evidence, consent/audit metadata, processors and backups. Do not promise immediate removal from immutable backups. Set backup expiry and restore procedures that reapply deletion tombstones before serving records. Display truthful pending/completed states and limitations rather than silent indefinite retention.
+
+## Verification and decisions
+
+Test cross-user operations/downloads/jobs, grant revocation, moderator/community isolation, cache leaks, malicious uploads/prompt injection, logging, deletion propagation and restore. See [Testing](TESTING.md).
+
+Open: jurisdiction/legal basis, age policy, controller/processors, residency, retention/backup schedules, recovery objectives, incident response and reviewed privacy notice. No legal or clinical compliance claim is supported.

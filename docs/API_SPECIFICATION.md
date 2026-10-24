@@ -1,37 +1,54 @@
 # API specification
 
-## Existing, verified functionality
+## Status and common contract
 
-No endpoints, server, authentication contracts or validators exist. Every endpoint below is a draft proposal.
+**All endpoints below are proposed; none is implemented.** Draft prefix `/api/v1`. JSON except protected file transfers. Session technology is undecided. Private requests require verified server identity, owner/role authorization, input validation and any required purpose/recipient grant. Derive owner from session; reject client owner IDs. Public reads expose only published data.
 
-## Proposed functionality
+Lists use bounded date ranges/limits and opaque cursors: `{items,nextCursor}`. Private entries return `{id,version,createdAt,updatedAt,...validatedFields}`. Updates require expectedVersion; side effects require idempotency keys. Health responses use private/no-store. Define CSRF/origin handling for cookie sessions. Rate limits are required per account/IP/operation, stricter for AI/uploads/bookings/posts/reports; numerical budgets remain undecided. 429 includes Retry-After.
 
-Draft same-origin JSON API `/api/v1`; private requests require server session verification and owner-scoped authorization.
+## Draft endpoints
 
-| Method | Draft path | Purpose |
+Paths omit prefix. GET lists, POST creates, PATCH edits, DELETE follows lifecycle policy. Every row has status **proposed**.
+
+| Module / methods and paths | Request → response | Authorization / validation |
 | --- | --- | --- |
-| GET, PATCH | /me | Minimal profile/preferences |
-| GET, POST | /symptoms | Paginated list/create |
-| GET, PATCH, DELETE | /symptoms/{id} | Owner-scoped detail/edit/delete |
-| GET, POST | /bleeding-entries | Optional daily records |
-| PATCH, DELETE | /bleeding-entries/{id} | Edit/delete |
-| GET, POST | /journal-entries | List/create |
-| GET, PATCH, DELETE | /journal-entries/{id} | Detail/edit/delete |
-| GET | /resources and /resources/{slug} | Public reviewed education |
-| GET | /observations | Bounded range and provenance |
-| POST | /appointment-summaries/preview | Selected records and questions |
-| POST | /exports | Request scoped export |
-| GET | /exports/{id} | Owner-scoped status/download |
-| GET, POST | /consents | Status/purpose-specific action |
-| POST | /privacy-requests | Account export/deletion request |
-| GET | /privacy-requests/{id} | Lifecycle status |
+| Identity: GET/PATCH /me; GET/POST /consents; POST /consents/{id}/withdraw | Minimal preferences or purpose/scope/recipient grant → profile/grant state | Session owner; cannot grant another owner's records |
+| Mind & Wellness: GET/POST /wellness-entries; GET/PATCH/DELETE /wellness-entries/{id}; same for /journal-entries | Date/optional check-in fields or journal body → versioned entry/list | Owner, bounded fields; journals private by default |
+| Period Tracker: GET/POST /periods; GET/PATCH/DELETE /periods/{id}; same for /symptoms; GET /cycle-estimates | Dates/optional logs/range → records or estimate/method/coverage | Owner; validate date order/open intervals; insufficient-data state explicit |
+| PCOS Insights: POST /pcos-summaries/preview; GET/PATCH/DELETE /pcos-summaries/{id}; POST /pcos-summaries/{id}/review | Selected source versions/range/user edits → draft/reviewed/outdated description | Owner plus selected cross-module scope; no diagnostic probability |
+| AI Assistant: POST /ai-conversations; POST /ai-conversations/{id}/messages; GET/DELETE /ai-conversations/{id} | Question, selected context/grant → message/sources/limitations or processing state | Owner and scoped processing consent; no automatic journal context |
+| Reports: POST /health-documents; GET/DELETE /health-documents/{id}; GET /health-documents/{id}/findings; PATCH /health-documents/{id}/findings/{findingId}; POST /health-documents/{id}/review | Declared type/size → protected upload instruction; correction/review → finding state | Owner, type/size/quarantine validation and processing scope; draft until user review |
+| Women's Health Library: GET /library/topics; GET /library/articles; GET /library/articles/{slug}; POST /editorial/articles; PATCH /editorial/articles/{id} | Query/topic or editorial revision → article/source/review metadata | Published reads public; editorial role for writes; truthful review status |
+| Appointments & Clinic: GET /clinics; GET /clinics/{id}; GET/POST /appointments; GET/PATCH /appointments/{id} | Filters or sourced provider/slot request → directory metadata or booking state/mode | Public directory; owner booking; confirmation from actual provider only |
+| Sharing: POST /summary-shares/preview; POST /summary-shares; GET /summary-shares/{id} | Reviewed version/recipient/grant → preview/dispatch/receipt status | Owner, separate recipient-specific approval, recheck before dispatch |
+| Provider: POST /integrations/providers/{provider}/events | Signed event/external ID → reconciliation acknowledgement | Provider authentication/signature, replay/idempotency checks |
+| Sisterhood: GET /community/topics; GET/POST /community/posts; GET/PATCH/DELETE /community/posts/{id}; GET/POST /community/posts/{id}/comments; PATCH/DELETE /community/comments/{id} | Community topic/query/text → community feed/thread | Public reads per policy; own community identity writes; reject private-record fields/attachments |
+| Community actions: POST/DELETE /community/posts/{id}/reaction; GET/POST /community/bookmarks; DELETE /community/bookmarks/{id}; POST/DELETE /community/blocks/{communityUserId}; POST /community/reports | Target/action/reason → own state or protected receipt | Actor scope, block enforcement, abuse limits; reporter hidden from target |
+| Moderation: GET /moderation/reports; POST /moderation/actions; POST /community/appeals | Community evidence/action/appeal → restricted decision state | Moderator role for queue/actions, own appeals; no private-health access |
+| Shared: GET/POST /reminders; PATCH/DELETE /reminders/{id}; POST /exports; GET /exports/{id}; POST /privacy-requests; GET /privacy-requests/{id} | Opt-in schedule/selected versions/deletion request → status/expiry | Owner; scoped export, neutral reminders and protected downloads |
 
-Draft symptom payload: symptomCode, severity (scale pending), occurredAt (ISO instant), timezone (IANA), optional bounded note. Reject client userId; derive identity from session. Return server ID, timestamps and version. Updates supply expected version.
+## Synthetic structures
 
-Lists use bounded from/to/limit and opaque cursor with stable date/ID ordering. Draft status codes: 201 create, 200 read/update, 204 immediate delete, 202 asynchronous job, 400 invalid request, 401 session required, 404 missing/inaccessible object, 409 edit conflict, 422 semantic validation, 429 rate limit, 500 safe generic failure.
+POST /periods:
 
-Error shape: `{error: {code, message, fieldErrors?, requestId}}`. Never expose health text, SQL or another user's object existence. Health responses use private/no-store caching. Define CSRF/origin handling, request limits and idempotency before implementation.
+```json
+{"startDate":"2026-09-01","endDate":"2026-09-05","timezone":"Asia/Kolkata"}
+```
 
-## Decisions still needed
+201 response:
 
-OpenAPI schemas, exact enums/limits, authentication callback routes, consent categories, export format/expiry, idempotency retention and synchronous versus queued processing.
+```json
+{"id":"synthetic-period-1","startDate":"2026-09-01","endDate":"2026-09-05","version":1}
+```
+
+PCOS preview request: `{sources:[{type,id,version}],range:{from,to},consentId}`. Response: `{id,state,sourceVersions,coverage,descriptiveObservations,limitations,userEdits,methodVersion}`. No PCOS probability field. Missing days unknown.
+
+AI message request: `{question,selectedContextVersions,consentId}`. Response: `{message,sources,limitations,selectedContextVersions}` or safe processing/unavailable state. Retrieved citations must exist and support the answer.
+
+Share request: `{summaryId,summaryVersion,recipientId,consentId,idempotencyKey}`. 202 response: `{id,status,recipientId,approvedVersion}`. Approval/dispatch/receipt is distinct from booking confirmation. File/job response: `{id,state,requestId}` with owner-protected polling. User review of extraction confirms transcription, not diagnosis.
+
+## Errors and open schema work
+
+Error: `{error:{code,message,fieldErrors?,requestId}}`, with no health text, SQL, storage keys or another user's existence. Codes: 400 malformed, 401 session required, 403 role/purpose denied, 404 missing/inaccessible private object, 409 edit conflict/outdated approval, 413 oversized, 415 unsupported media, 422 semantic validation, 429 rate limit, 502/503 integration failure, 500 generic failure. Sparse history returns insufficient-data, not reassurance.
+
+Reject invalid dates/enums/lengths/ranges, unowned selections, stale versions, revoked grants, unreviewed findings treated as confirmed and any private-record import in community writes. Recheck queued job permissions at execution. Final OpenAPI schemas, enums/limits, auth callbacks, numeric rate budgets, export expiry and idempotency retention await platform selection; these draft shapes are not executable contracts.

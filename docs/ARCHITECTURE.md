@@ -1,30 +1,44 @@
 # Architecture
 
-## Existing, verified functionality
+## Existing architecture
 
-Actual architecture: Git repository with `.gitattributes` only. No technology stack or application boundaries exist.
+Documentation only: no executable frontend/backend, database, authentication, AI, reports, clinics or community integration. No technology stack is selected. Earlier Next.js/PostgreSQL suggestions were unimplemented options. See [audit](../README.md).
 
-## Proposed functionality
+## Proposed boundaries
 
-Provisional recommendation: TypeScript + React/Next.js, server API/services, PostgreSQL and managed identity. A modular monolith limits operational overhead while preserving domain boundaries.
+Choose runtime, storage and identity through an architecture decision before implementation. A modular monolith is an option to limit operational overhead, not a selected framework. Domain boundaries do not require separate databases prematurely.
 
 ```mermaid
-flowchart LR
-  Visitor --> Public[Public marketing and reviewed education]
-  User --> App[Authenticated application]
-  App --> API[Server session, validation and authorization]
-  Identity[Managed identity] --> API
-  API --> DB[(Private PostgreSQL)]
-  API --> Rules[Versioned descriptive rules]
-  API --> Export[User-reviewed export]
+flowchart TD
+  Browser[Public pages and shared application shell] --> Gate[Server session, authorization, validation and purpose gate]
+  Gate --> Private[Mind & Wellness and Period Tracker records]
+  Gate --> PCOS[PCOS Insights and reviewed summaries]
+  Gate --> AI[AI Assistant and report processing]
+  Gate --> Clinic[Appointments & Clinic adapter]
+  Gate --> Library[Women's Health Library publication service]
+  Gate --> Community[Sisterhood community-only service and index]
+  Private -->|Explicit selected record access| PCOS
+  Private -->|Explicit selected record access| AI
+  PCOS -->|Review and recipient-specific approval| Clinic
+  AI --> Files[Private quarantine and document storage]
+  Clinic --> Provider[Unselected external provider system]
+  Community --> CommunityStore[Community-only storage boundary]
 ```
 
-The diagram is proposed, not deployed. Public pages and private application need distinct layouts, bundles and cache policies. A separate marketing domain remains optional.
+All components are proposed. Sisterhood has no private-record read path. Shared internal identity does not grant shared data access; public community IDs/display names are separate with restricted account linkage.
 
-Data flow: browser submits over HTTPS; server verifies session, consent where applicable, payload and ownership; transaction saves; acknowledgement refreshes history. Rules read eligible owner-scoped records and return provenance. Exports use a bounded user-selected snapshot and preview. Edits/deletions invalidate dependent outputs.
+Frontend owns interaction, selection and preview; server owns authentication, owner/role authorization, purpose/recipient consent, validation, persistence and credentials. Route guards alone are insufficient. Public marketing/education can be cached; health pages/responses require private/no-store policies and cannot enter static public output.
 
-Browser holds no server secrets. Identity provider authenticates; application authorizes; database remains private; reviewed publication workflow controls education. No advertising tracking in private routes. Record accepted architecture decisions with alternatives and tradeoffs before scaffolding.
+## Data flow and integrations
 
-## Decisions still needed
+Private write: server session → validate ownership/input/version/purpose → transaction → acknowledgement → refreshed history. Reuse canonical records via authorized references. Derived artifacts store source IDs/versions, method version, coverage and review state. Changed/deleted sources invalidate affected summaries or mark them outdated; approval for a changed payload must be renewed. Already delivered/downloaded copies cannot be silently recalled.
 
-Stack approval, host/region, identity provider, same-origin API versus separate service, content storage, summary execution, availability target, age policy and data lifecycle.
+AI receives a bounded context assembled from explicitly authorized selections, never database-wide access. Report flow: private upload validation/quarantine/malware handling → extraction draft with page/span/uncertainty → user correction/review → selected downstream use. User verification confirms transcription, not a clinical diagnosis. Treat uploaded text as untrusted input, not model instructions.
+
+Clinic adapters distinguish synthetic demo, requested, pending, provider-confirmed, declined, cancelled and unknown states. Verify callbacks/replay handling; no invented directory metadata or availability. Sharing approval, dispatch, receipt and booking confirmation are separate events.
+
+Library publishing controls sources/reviewer metadata/revisions. Community services, search, suggestions, attachments and moderators cannot join private records into community content or infer topics from private history.
+
+## Security and decisions
+
+Server secrets stay server-side. Apply least privilege, private storage, encryption/key review, minimal logs, rate limits, consent rechecks in jobs, deletion/invalidation and tested restore. None exists yet. Open: stack, providers, region, session model, content storage, queues, notifications, clinical/moderation owners, age policy and availability/recovery budgets. See [Backend](BACKEND.md), [Data model](DATA_MODEL.md) and [Security](SECURITY_AND_PRIVACY.md).

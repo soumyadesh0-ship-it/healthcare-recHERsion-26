@@ -1,23 +1,33 @@
 # Design system
 
-## Existing, verified functionality
+## Status
 
-No tokens, components, CSS or animation libraries exist.
+Proposed only: no tokens, CSS, components or animation tools exist. [Brand identity](BRAND_IDENTITY.md) owns the canonical palette/voice. [Frontend](FRONTEND.md) owns shared navigation. Avoid duplicate conflicting specifications.
 
-## Proposed functionality
+## Layout and components
 
-Use exact base colors from BRAND_IDENTITY with semantic aliases for canvas, text, action, focus, selected and error. Decorative palette colors must not imply clinical status.
+Spacing: 4/8/12/16/24/32/48/64/96px. Public width approximately 1200px, reading width 60–72 characters; mobile gutters about 20px, desktop 40–64px. Content-driven 4/8/12-column layouts around 640/960/1280px are starting points. Support 320px without horizontal page scrolling and text zoom/reflow. Suggested type: fluid hero 40–88px, section 28–48px, card 20–24px, body 16–18px, metadata 14px. Suggested radius: fields 12px/cards 20px; restrained shadows/borders.
 
-Spacing: 4/8/12/16/24/32/48/64/96px. Public max-width approximately 1200px, reading width 60-72 characters, mobile gutters 20px and desktop 40-64px. Use content-driven 4/8/12-column layouts around 640/960/1280px. Support 320px without horizontal page scrolling.
+| Component | Convention |
+| --- | --- |
+| Navigation | Seven-module shell, active text/state, skip link, keyboard order and accessible mobile menu |
+| Buttons | Verb labels; verified-contrast primary, outlined/text secondary, visible focus/hover/disabled/busy; confirm destructive action |
+| Cards | Heading and grouped information; explicit actions, no nested click targets |
+| Forms | Persistent labels, optional/required markers, inline help/errors, native controls where practical, preserved safe input and explicit save status |
+| Calendar | Keyboard date movement, text selection, open/irregular periods and labeled estimates |
+| Chart/table | Labels/patterns beyond colour, visible gaps/coverage, keyboard details and equivalent table/summary |
+| Consent/summary | Selected records, purpose/recipient/version, review/withdrawal controls and stale warning |
+| Community composer | Deliberate community text only, disclosure guidance and no private-record attachment/prefill |
+| Dialog/status | Accessible name/focus/escape/return behavior; announce results without excessive live-region noise |
 
-Type: fluid 40-88px hero, 28-48px section headings, 20-24px card headings, 16-18px body and 14px metadata. Radius: 12px fields, 20px cards; restrained borders and shadows. Pills suit tags rather than every container.
+## Accessibility and states
 
-Components: navigation, buttons, labeled fields, date/time controls, symptom selector, severity input, record card, timeline, chart/table pair, article card, consent panel, dialog, alerts, loading and empty states. Define hover, keyboard focus, selected, disabled, invalid, loading, error and success behavior. Preserve input on failure and announce save results. Use native controls where practical.
+Target WCAG 2.2 AA, pending verification: semantic headings/landmarks, explicit labels, visible unobscured focus, keyboard operation, accessible dialogs, zoom/reflow and approximately 44px touch targets where practical. Verify actual text/non-text contrast; errors/success cannot rely on colour.
 
-Target WCAG 2.2 AA, pending verification: visible focus, skip link, semantic headings, explicit labels, accessible dialogs, 200% zoom, and approximately 44px touch targets. Charts require text summaries and equivalent tables. Error states need words, not just color.
+Empty: optional next action. Loading: operation identified/duplicates prevented. Success: only confirmed action. Error: preserve safe input and offer recovery. Also distinguish insufficient data, stale summaries, withdrawn consent, expired sessions, extraction drafts and unknown provider outcomes. Timeouts cannot become apparent success.
 
-Motion: 150-220ms control feedback, 300-500ms one-time section reveals using opacity/transform. Progressive enhancement keeps content visible without JavaScript. Reduced motion removes parallax, morphing, animated scrolling and chart drawing. Avoid scroll hijacking. Smooth anchor scrolling is optional and disabled for reduced motion.
+## Motion and depth
 
-## Decisions still needed
+Suggested feedback 150–220ms, one-time opacity/transform reveals 300–500ms. Page transitions preserve focus/order and never block forms. Progressive enhancement keeps content visible without scripts. Reduced motion removes smooth scrolling, parallax, morphing, chart drawing and animated transitions; use immediate/static equivalents. No scroll hijacking/flashing. Prefer CSS/SVG depth; 3D requires measured benefit, budget and accessible fallback.
 
-Final tokens, contrast testing, browser matrix, component ownership and chart tooling. No 3D dependency is currently justified.
+Resolve actual tokens/contrast, browser matrix, component ownership, charts and font licenses during foundation work. No rendering/accessibility tests have run.

@@ -1,30 +1,29 @@
 # Frontend
 
-## Existing, verified functionality
+## Status
 
-No framework, manifest, dependencies, routes, components or UI exists. No visual or browser test has run.
+No frontend, framework, package manifest, routes, components, styles, fonts, assets or animation library exists. No visual/browser/accessibility/performance test has run. All designs below are proposed; framework selection remains open.
 
-## Proposed functionality
+## Shared navigation and boundaries
 
-Recommend TypeScript and React/Next.js for server-rendered public content and a separate authenticated layout. This is provisional, not installed.
+One authenticated shell exposes seven primary labels: Mind & Wellness, AI Assistant, Appointments & Clinic, Period Tracker, Sisterhood, Women's Health Library, PCOS Insights. Shared home/account/privacy are utilities, not extra primary modules. Desktop navigation is predictable; mobile makes every module reachable through an accessible menu or compact navigation without crowding seven tabs.
 
-Draft public routes: `/`, `/features`, `/learn`, `/learn/[slug]`, `/privacy`, `/accessibility`. Account routes: `/sign-in`, `/onboarding`. Private routes: `/app`, `/app/symptoms`, `/app/timeline`, `/app/cycle`, `/app/journal`, `/app/observations`, `/app/appointments`, `/app/settings/privacy`.
+Proposed paths: `/app/wellness`, `/app/assistant`, `/app/appointments`, `/app/periods`, `/app/sisterhood`, `/library`, `/app/pcos`. Utilities: `/app`, `/app/settings/privacy`, `/sign-in`, `/onboarding`. Public examples: `/`, `/features`, `/library/articles/{slug}`, `/privacy`, `/accessibility`. These routes do not exist. Reuse public library content without private context.
 
-Landing storyboard:
+Shared entry forms, calendars, chart/table pairs, consent selectors and summary previews should follow [Brand identity](BRAND_IDENTITY.md) and [Design system](DESIGN_SYSTEM.md). AI/PCOS/clinician transitions display selected inputs and purpose before access, never preload all records. Community cannot import private records/summaries/AI history.
 
-1. Obsidian immersive hero, oversized editorial "Your health. A clearer picture.", porcelain text, violet/teal organic SVG form and honest availability CTA.
-2. Porcelain editorial section: record, understand, prepare; one-time scroll reveals preserve reading order.
-3. Keyboard-accessible feature tabs show logger, timeline and journal with clearly labeled synthetic records and reset controls.
-4. Illustrative animated chart shows counts, date range and missing data; equivalent table and instant reduced-motion view remain available.
-5. Appointment preview lets visitors select synthetic records and see the summary change.
-6. Evidence and privacy sections describe only protections actually implemented before publication.
+## Landing storyboard
 
-Use CSS/SVG biological forms first. Consider a lazily loaded Three.js/React Three Fiber island only if a measured user benefit justifies bundle cost, mobile performance and static fallback. Do not add 3D for decoration alone.
+1. Obsidian/porcelain editorial hero with honest availability, welcoming copy and lightweight organic depth illustration.
+2. Seven-module overview connecting record → understand → prepare, with separate private wellness/community boundaries.
+3. Keyboard-accessible calendar/chart previews using visibly synthetic data, coverage labels and reset controls.
+4. Synthetic summary-selection preview; no real upload/provider booking claims.
+5. Transparent sources/review/privacy sections describing only verified capabilities when published.
 
-Private UI: calm navigation, prominent logging action, accessible forms, explicit empty/loading/error/expired-session states. Never put private results in public caches, static output, analytics or URLs. Route guards supplement server authorization.
+Use CSS/SVG/static depth first. Optional lazy-loaded 3D needs measured benefit, performance budget, text/keyboard equivalent and static fallback; no dependency is currently justified. Smooth anchors, subtle scroll reveals and short page transitions respect reduced motion and cannot delay forms/hide content/hijack scrolling. Charts/calendars require keyboard access and text/table alternatives.
 
-Proposed performance targets: LCP <=2.5s, INP <=200ms, CLS <=0.1 at the 75th percentile. These are not measured results. Test low-end mobile and slow networks before adding effects.
+## States, performance and decisions
 
-## Decisions still needed
+Provide empty/loading/success/error/expired-session states throughout. Show denied/revoked consent, insufficient data, stale summaries, offline/extraction/provider uncertainty explicitly. Preserve safe unsaved input on recoverable failures; sensitive persistent browser drafts require a reviewed design. Do not claim save/extraction/booking/delivery success without server evidence. No private results in public caches, static output, analytics or URLs; route guards supplement server authorization.
 
-Framework/package manager approval, chart library, fonts, supported browsers, deployment rendering model and prototype-versus-public-release scope.
+Proposed goals: WCAG 2.2 AA; 75th-percentile LCP ≤2.5s, INP ≤200ms, CLS ≤0.1. These are not measured results. Evaluate low-end mobile/slow networks before effects. Resolve framework/package manager, rendering model, browser matrix, chart tools, fonts and prototype/public-release scope.

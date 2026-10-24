@@ -1,39 +1,39 @@
-# Auracare - Women Health Companion
+# Auracare — Women's Health Companion
 
-Audit: 2026-10-24, commit `5d12b73` (Initial commit).
+Auracare is a planned platform for recording personal health history, understanding information and preparing for healthcare conversations. It addresses fragmented records, confusing terminology and disconnected wellbeing, education, community and appointment experiences. Target users span women's health life stages; do not assume everyone menstruates, seeks pregnancy or shares the same anatomy or goals. Age eligibility and launch geography remain open.
 
-## Existing, verified functionality
+## Verified repository audit
 
-The repository tracks only `.gitattributes`, containing `* text=auto`. Inventory and history checks found no application source, package manifest, lockfile, frontend, backend, database, API, authentication, environment configuration, UI, routes, tests, or deployment configuration. README.md and AGENTS.md were absent. Ancestor AGENTS.md checks found no instructions. No runnable product functionality exists to preserve, replace, or test.
+Audit date: 2026-10-24; inspected HEAD: `fcce99b`. The repository contains documentation, `.gitattributes` and a tracked, unrelated `Microsoft/Windows/PowerShell/ModuleAnalysisCache`, left untouched. Earlier documentation incorrectly described only initial commit `5d12b73` and called the cache untracked. All existing documentation, directory inventory, tracked files/history and ancestor instruction locations were inspected. No applicable `AGENTS.md` was found.
 
-The untracked `Microsoft/Windows/PowerShell/ModuleAnalysisCache` is unrelated machine-generated data and was left untouched. Git internals and that cache are excluded from application-source assessment. No secrets were read. Audit used file inventory, git ls-files/status/log, and instruction-file checks; it did not establish runtime behavior.
+There is no frontend, backend, package manifest, lockfile, database/schema, API, authentication, tests, assets, environment template or deployment configuration. No product feature is implemented, partial or prototyped. Documentation is specification only. No application technology stack is verified or selected; earlier Next.js/PostgreSQL recommendations were provisional options, not facts.
 
-## Proposed functionality
+## Seven planned modules
 
-Auracare helps users record symptoms, understand personal patterns, access reviewed education, and prepare for healthcare conversations. Separate public marketing from an authenticated health application. Begin with reliable records and transparent rules, without diagnostic claims.
+| Module | Purpose | Status |
+| --- | --- | --- |
+| Mind & Wellness | Private optional check-ins, journaling, stress/sleep and wellbeing history | Planned |
+| AI Assistant | Explain information and selected reports, summarize records and prepare questions | Planned |
+| Appointments & Clinic | Sourced directory, requests, booking management and approved consultation preparation | Planned |
+| Period Tracker | Editable menstrual records, calendar/history and transparent estimates | Planned |
+| Sisterhood | Pseudonymous topic communities with reporting, blocking and moderation | Planned |
+| Women's Health Library | Accessible sourced education across life stages | Planned |
+| PCOS Insights | Descriptive history and user-reviewed assessment preparation | Planned |
 
-Recommended architecture, pending approval: TypeScript, React/Next.js, server-side services, PostgreSQL, and managed authentication. None is installed. There is no existing technology stack to change.
+Differentiators are unified navigation, controlled cross-module access, visible provenance/missing data, non-diagnostic observations and strict community/private-record separation. These are requirements, not deployed protections.
 
-Documentation index:
+## Setup and limitations
 
-- [Product overview](docs/PRODUCT_OVERVIEW.md)
-- [Features](docs/FEATURES.md)
-- [Brand identity](docs/BRAND_IDENTITY.md)
-- [Design system](docs/DESIGN_SYSTEM.md)
-- [Frontend](docs/FRONTEND.md)
-- [Backend](docs/BACKEND.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Data model](docs/DATA_MODEL.md)
-- [User flows](docs/USER_FLOWS.md)
-- [Pipeline and roadmap](docs/PIPELINE.md)
-- [API specification](docs/API_SPECIFICATION.md)
-- [AI and clinical safety](docs/AI_AND_CLINICAL_SAFETY.md)
-- [Security and privacy](docs/SECURITY_AND_PRIVACY.md)
-- [Testing](docs/TESTING.md)
-- [Deployment](docs/DEPLOYMENT.md)
+Open the Markdown files to review the project. No verified install, development, build, migration, test or deployment commands exist. Add executable setup instructions after selecting and implementing a stack; do not invent package commands. No dependencies were installed or application source rewritten. Demonstrations must use labeled synthetic data.
 
-There are no verified install, development, build, or test commands. Add them after scaffolding. No application code or dependency was changed during this documentation phase.
+No AI, provider booking, security control, medical review, clinical validation or compliance is established. No diagnosis, prescribing, PCOS probability, fertility accuracy or contraceptive reliability is promised. Resolve stack/providers, age/geography, clinical/editorial/moderation owners, data region, retention and backup policy before relevant implementation phases.
 
-## Decisions still needed
+## Documentation
 
-Confirm stack, audience, age policy, launch geography, clinical reviewer, hosting/data region, authentication provider, and retention policy. Next: resolve architecture decisions, then build an accessible landing prototype with synthetic data.
+Existing equivalent filenames are retained rather than creating duplicate requirements/roadmap files.
+
+- [Product requirements](docs/PRODUCT_OVERVIEW.md) and [features](docs/FEATURES.md)
+- [Brand identity](docs/BRAND_IDENTITY.md), [design system](docs/DESIGN_SYSTEM.md), [frontend](docs/FRONTEND.md)
+- [Architecture](docs/ARCHITECTURE.md), [backend](docs/BACKEND.md), [data model](docs/DATA_MODEL.md), [API](docs/API_SPECIFICATION.md)
+- [User flows](docs/USER_FLOWS.md), [AI and clinical safety](docs/AI_AND_CLINICAL_SAFETY.md), [security and privacy](docs/SECURITY_AND_PRIVACY.md)
+- [Testing](docs/TESTING.md), [deployment](docs/DEPLOYMENT.md), [roadmap](docs/PIPELINE.md)

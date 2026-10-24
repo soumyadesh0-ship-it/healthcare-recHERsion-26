@@ -1,27 +1,31 @@
 # Brand identity
 
-## Existing, verified functionality
+## Verified status
 
-No logo, fonts, assets or styles exist. The palette below is the user-specified direction.
+No logo, fonts, assets, styles or components exist; no existing visual implementation is being replaced. This is the user's specified direction. [Design system](DESIGN_SYSTEM.md) defines component details.
 
-## Proposed functionality
+## Personality and voice
 
-Premium and editorial; empathetic and empowering; modern and scientifically grounded. Voice: "Your records, in context." Avoid unsupported statements such as "Your hormones are balanced."
+Premium, editorial, welcoming, calm, human and contemporary. Confident navigation with empathetic plain-language explanations. Say "Your records, in context" and "These dates are estimates." Avoid diagnoses, judgment about missed entries or pressure to disclose. Respect diverse life stages, bodies and goals.
 
-| Color | Hex | Role |
+## Canonical five-colour palette
+
+| Colour | Hex | Role |
 | --- | --- | --- |
 | Obsidian Black | #17151C | Primary text, dark hero and strong surfaces |
 | Porcelain White | #FAF8F5 | Main canvas and text on dark surfaces |
-| Electric Violet | #8B5CF6 | Brand emphasis and selected states |
+| Electric Violet | #8B5CF6 | Brand emphasis, selected states and focus accents |
 | Living Coral | #FF746C | Warm accent and labeled data series |
 | Vital Teal | #43C6AC | Secondary data and completion accents |
 
-Use porcelain and obsidian predominantly. Color alone must not convey medical or interaction meaning. Test all foreground/background pairs; white on accent colors is not automatically suitable. Prefer obsidian text on coral/teal.
+Porcelain/obsidian dominate. Accent colour alone cannot signal error, success, symptoms or clinical meaning. Prefer obsidian text on accent fills, then verify actual pairs/focus states. Porcelain on violet is not approved for normal text without contrast verification. Target 4.5:1 normal text, 3:1 large text and applicable non-text UI contrast. Base colours are fixed; semantic variants need documented contrast evaluation.
 
-Typography proposal: Fraunces-like editorial serif for marketing headlines and Source Sans 3-like readable sans for body/application UI. Fonts are not installed or license-verified. Self-host approved subsets with system fallbacks. Body 16-18px, line height 1.5-1.7; use tabular numerals for data.
+## Typography, layout and interaction
 
-Generous whitespace and asymmetric public layouts contrast with predictable aligned private records. Organic SVG contours evoke biological rhythms without claiming anatomical accuracy. Use inclusive commissioned imagery with consent and rights provenance. Motion explains continuity and remains optional.
+Direction: editorial serif marketing headlines and readable sans-serif body/application UI. Fraunces-like and Source Sans 3-like styles are references, not installed/final licensed choices. Review licenses/subsets before self-hosting; retain system fallbacks. Body 16–18px, line height 1.5–1.7, reading width 60–72 characters and tabular data numerals.
 
-## Decisions still needed
+Generous whitespace and selective asymmetric public layouts; predictable aligned private records. Buttons use concise verbs, cards group related content, forms retain labels/optional indicators/errors, and charts include text/table equivalents. Responsive reading order, keyboard access and privacy controls take priority over decorative layout.
 
-Wordmark, final fonts/licenses, illustration ownership, photography rights, tone research and contrast-qualified color variants.
+Make the landing memorable through labeled synthetic interactive previews, gentle scrolling/reveals, thoughtful page continuity and lightweight depth. Respect reduced motion and performance; keep content visible without animation/scripts. No forced 3D dependency. Empty states welcome optional participation, loading identifies the operation, success requires evidence and errors explain recovery. Preserve honest booking/estimate/report-draft status.
+
+Open: wordmark, final font licenses, imagery rights, contrast-qualified tokens and user research. No visual/accessibility/performance validation has occurred. See [Frontend](FRONTEND.md).
