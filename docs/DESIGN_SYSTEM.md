@@ -1,5 +1,7 @@
 # Design system
 
+> Mobile override (2026-10-25): the explicit mobile brief and [Flutter theme](../Auracare_mobile_app/auracare_mobile_app/lib/app/theme.dart) govern the new demo: five new palette tokens, system sans, 20px gutters, rounded cards/forms, five labeled bottom destinations and >=48px controls. The web/3D layout below is historical proposed scope. See [Mobile UI handoff](MOBILE_UI_HANDOFF.md).
+
 ## Status
 
 Proposed only: no tokens, CSS, components or animation tools exist. [Brand identity](BRAND_IDENTITY.md) owns the canonical palette/voice. [Frontend](FRONTEND.md) owns shared navigation. Avoid duplicate conflicting specifications.

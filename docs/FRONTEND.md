@@ -1,5 +1,7 @@
 # Frontend
 
+> Mobile override (2026-10-25): the current UI implementation is Flutter/Dart, with Home, Timeline, Learn, Insights and Profile tabs. Web routes, landing-page plans and framework selection below are historical proposals, not the mobile implementation contract. See [Mobile UI handoff](MOBILE_UI_HANDOFF.md) and the [Flutter package](../Auracare_mobile_app/auracare_mobile_app/README.md).
+
 ## Status
 
 No frontend, framework, package manifest, routes, components, styles, fonts, assets or animation library exists. No visual/browser/accessibility/performance test has run. All designs below are proposed; framework selection remains open.

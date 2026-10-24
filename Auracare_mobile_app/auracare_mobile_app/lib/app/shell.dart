@@ -1,0 +1,140 @@
+import 'package:flutter/material.dart';
+
+import 'theme.dart';
+import '../core/widgets.dart';
+import '../features/home/home.dart';
+import '../features/timeline/timeline.dart';
+import '../features/learn/learn.dart';
+import '../features/insights/insights.dart';
+import '../features/profile/profile.dart';
+
+class AppShell extends StatefulWidget {
+  const AppShell({super.key});
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  int index = 0;
+  static const labels = ['Home', 'Timeline', 'Learn', 'Insights', 'Profile'];
+  static const icons = [
+    Icons.home_outlined,
+    Icons.view_agenda_outlined,
+    Icons.menu_book_outlined,
+    Icons.insights_outlined,
+    Icons.person_outline,
+  ];
+  final pages = const [
+    HomePage(),
+    TimelinePage(),
+    LearnPage(),
+    InsightsPage(),
+    ProfilePage(),
+  ];
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(index == 0 ? 'auracare' : labels[index]),
+      bottom: PreferredSize(
+        preferredSize: Size.fromHeight(demoBadgeHeight(context)),
+        child: DemoBadge(),
+      ),
+    ),
+    body: SafeArea(
+      top: false,
+      bottom: false,
+      child: IndexedStack(index: index, children: pages),
+    ),
+    bottomNavigationBar: SafeArea(
+      top: false,
+      child: Material(
+        color: Palette.mist,
+        child: MediaQuery.textScalerOf(context).scale(14) > 20
+            ? LayoutBuilder(
+                builder: (context, constraints) => Wrap(
+                  children: List.generate(
+                    5,
+                    (i) => SizedBox(
+                      width: constraints.maxWidth / 2,
+                      child: Semantics(
+                        selected: index == i,
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: TextButton(
+                            key: ValueKey('tab-${labels[i]}'),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(48, 56),
+                              backgroundColor: index == i
+                                  ? Palette.blush
+                                  : Palette.mist,
+                            ),
+                            onPressed: () => setState(() => index = i),
+                            child: Text(labels[i], textAlign: TextAlign.center),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: List.generate(
+                    5,
+                    (i) => Expanded(
+                      child: Semantics(
+                        selected: index == i,
+                        button: true,
+                        label: labels[i],
+                        excludeSemantics: true,
+                        child: InkWell(
+                          key: ValueKey('tab-${labels[i]}'),
+                          onTap: () => setState(() => index = i),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 2,
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: index == i
+                                        ? Palette.blush
+                                        : Palette.mist,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Icon(icons[i], color: Palette.plum),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  labels[i],
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: index == i
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    ),
+  );
+}
