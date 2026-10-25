@@ -214,7 +214,10 @@ void main() {
       expect(clipboard, contains('Headache'));
       expect(clipboard, isNot(contains('Fictional sample: noticed')));
       final id = session.records.entries.first.id;
-      await tester.runAsync(() => session.records.delete(id));
+      final version = session.records.entries.first.version;
+      await tester.runAsync(
+        () => session.records.delete(id, expectedVersion: version),
+      );
       await tester.pumpAndSettle();
       await tapText(tester, 'Copy synthetic summary');
       expect(clipboard, contains('No records selected.'));
@@ -306,7 +309,9 @@ void main() {
       tester,
       'Fatigue recorded on 1 of 1 days with entries. Days without entries are unknown.',
     );
-    await tester.runAsync(() => session.records.delete(entry.id));
+    await tester.runAsync(
+      () => session.records.delete(entry.id, expectedVersion: 2),
+    );
     await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();

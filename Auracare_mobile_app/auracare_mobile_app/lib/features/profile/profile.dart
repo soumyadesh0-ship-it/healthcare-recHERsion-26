@@ -38,8 +38,10 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
         if (authUser != null)
-          const Text(
-            'Health records in this app remain local to this session and are not uploaded to your account.',
+          Text(
+            session.records.isRemote
+                ? 'Health records use your private account storage when database deployment is enabled. Loading failures are shown above; no local fallback is used.'
+                : 'Health records in this app remain local to this session and are not uploaded to your account.',
           ),
         const Divider(),
         ExpansionTile(
@@ -50,7 +52,9 @@ class ProfilePage extends StatelessWidget {
               child: Text(
                 authUser == null
                     ? 'Alex · fictional demo profile\nSession only. Health records clear when the app restarts. Onboarding completion is remembered on Android. No account, cloud storage, encryption or legal compliance is claimed.'
-                    : 'This signed-in account is used only for authentication. Health records are synthetic, stay in this app session, clear when the app restarts, and are not uploaded or linked to your account.',
+                    : session.records.isRemote
+                    ? 'Account records are loaded from private storage. Demo records are never imported automatically.'
+                    : 'This account supports sign-in and explicitly confirmed PCOS draft summaries. Other health records are synthetic, stay in this app session, clear when the app restarts, and are not uploaded or linked to your account.',
               ),
             ),
           ],
@@ -147,65 +151,68 @@ class ProfilePage extends StatelessWidget {
               icon: Icons.edit_outlined,
               onTap: () => pushPage(context, const _CorrectionPage()),
             ),
-            FilledButton(
-              onPressed: () => copyText(
-                context,
-                session.account.exportSession(session.records.entries),
+            if (!session.records.isRemote)
+              FilledButton(
+                onPressed: () => copyText(
+                  context,
+                  session.account.exportSession(session.records.entries),
+                ),
+                child: const Text('Copy synthetic JSON export'),
               ),
-              child: const Text('Copy synthetic JSON export'),
-            ),
             const Text(
               'Export includes this session’s records, including journals. Copy only if intended. Clipboard content remains outside app reset. Remote export and account deletion are unavailable.',
             ),
-            OutlinedButton(
-              onPressed: () async {
-                if (await confirm(
-                  context,
-                  'Reset demo?',
-                  'Clear all records, questions and optional preferences for this session. Clipboard copies are not cleared.',
-                  action: 'Reset',
-                )) {
-                  session.reset();
-                  if (context.mounted) tell(context, 'Demo session reset');
-                }
-              },
-              child: const Text('Reset demo'),
-            ),
+            if (!session.records.isRemote)
+              OutlinedButton(
+                onPressed: () async {
+                  if (await confirm(
+                    context,
+                    'Reset demo?',
+                    'Clear all records, questions and optional preferences for this session. Clipboard copies are not cleared.',
+                    action: 'Reset',
+                  )) {
+                    session.reset();
+                    if (context.mounted) tell(context, 'Demo session reset');
+                  }
+                },
+                child: const Text('Reset demo'),
+              ),
             const Divider(),
           ],
         ),
-        ExpansionTile(
-          title: const Text('Demo tools'),
-          leading: const Icon(Icons.science_outlined),
-          children: [
-            TextButton(
-              onPressed: () {
-                session.records.failNextWrite = true;
-                tell(
-                  context,
-                  'Next record save/delete will fail once; retry preserves input.',
-                );
-              },
-              child: const Text('Simulate next write failure'),
-            ),
-            TextButton(
-              onPressed: () async {
-                if (await confirm(
-                  context,
-                  'Load fictional samples?',
-                  'Replace this session’s records with clearly fictional examples.',
-                  action: 'Load samples',
-                )) {
-                  session.records.reset(sample: true);
-                  if (context.mounted) {
-                    tell(context, 'Fictional samples loaded');
+        if (!session.records.isRemote)
+          ExpansionTile(
+            title: const Text('Demo tools'),
+            leading: const Icon(Icons.science_outlined),
+            children: [
+              TextButton(
+                onPressed: () {
+                  session.records.failNextWrite = true;
+                  tell(
+                    context,
+                    'Next record save/delete will fail once; retry preserves input.',
+                  );
+                },
+                child: const Text('Simulate next write failure'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  if (await confirm(
+                    context,
+                    'Load fictional samples?',
+                    'Replace this session’s records with clearly fictional examples.',
+                    action: 'Load samples',
+                  )) {
+                    session.records.reset(sample: true);
+                    if (context.mounted) {
+                      tell(context, 'Fictional samples loaded');
+                    }
                   }
-                }
-              },
-              child: const Text('Load sample records'),
-            ),
-          ],
-        ),
+                },
+                child: const Text('Load sample records'),
+              ),
+            ],
+          ),
         const Text(
           'Self-care suggestions, reminders, account privacy lifecycles, uploads, reports, AI, moderation and live provider services await reviewed implementations.',
         ),

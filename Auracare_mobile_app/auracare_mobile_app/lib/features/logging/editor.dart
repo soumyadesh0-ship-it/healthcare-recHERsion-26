@@ -72,6 +72,7 @@ class _EntryEditorState extends State<EntryEditor> {
   DateTime? when;
   String? zone, selection, id;
   bool busy = false, dirty = false, allowPop = false;
+  late bool observationTimeKnown = widget.entry?.observationTimeKnown ?? true;
   String? error;
   List<String> get choices => switch (widget.type) {
     EntryType.symptom => [
@@ -138,7 +139,7 @@ class _EntryEditorState extends State<EntryEditor> {
         await confirm(
           context,
           'Discard unsaved changes?',
-          'Your unsaved demo text will be discarded.',
+          'Your unsaved text will be discarded.',
           action: 'Discard',
         )) {
       if (!mounted) return;
@@ -152,12 +153,12 @@ class _EntryEditorState extends State<EntryEditor> {
   Future<void> save() async {
     if (busy || !form.currentState!.validate()) return;
     final repo = SessionScope.of(context).records;
-    id ??= widget.entry?.id ?? repo.newId();
     setState(() {
       busy = true;
       error = null;
     });
     try {
+      id ??= widget.entry?.id ?? repo.newId();
       await repo.save(
         HealthEntry(
           id: id!,
@@ -170,6 +171,7 @@ class _EntryEditorState extends State<EntryEditor> {
               ? observationLabel(widget.type)
               : selection!,
           when: when!,
+          observationTimeKnown: observationTimeKnown,
           zone: zone!,
           note: widget.type == EntryType.journal || widget.allowNotes
               ? note.text.trim()
@@ -203,7 +205,9 @@ class _EntryEditorState extends State<EntryEditor> {
       if (!mounted) return;
       tell(
         context,
-        widget.entry == null
+        repo.isRemote
+            ? 'Saved to your account'
+            : widget.entry == null
             ? 'Added to demo session'
             : 'Updated in demo session',
       );
@@ -225,7 +229,7 @@ class _EntryEditorState extends State<EntryEditor> {
       if (mounted) {
         setState(() {
           busy = false;
-          error = e.toString();
+          error = recordErrorMessage(e, deleting: false);
         });
       }
     }
@@ -235,7 +239,7 @@ class _EntryEditorState extends State<EntryEditor> {
     final repo = SessionScope.of(context).records;
     if (!await confirm(
       context,
-      'Delete this demo entry?',
+      repo.isRemote ? 'Delete this account entry?' : 'Delete this demo entry?',
       'This removes it from the timeline and refreshes derived summaries.',
       action: 'Delete',
     )) {
@@ -247,9 +251,17 @@ class _EntryEditorState extends State<EntryEditor> {
       error = null;
     });
     try {
-      await repo.delete(widget.entry!.id);
+      await repo.delete(
+        widget.entry!.id,
+        expectedVersion: widget.entry!.version,
+      );
       if (!mounted) return;
-      tell(context, 'Removed from demo session');
+      tell(
+        context,
+        repo.isRemote
+            ? 'Removed from your account'
+            : 'Removed from demo session',
+      );
       setState(() {
         dirty = false;
         allowPop = true;
@@ -262,7 +274,7 @@ class _EntryEditorState extends State<EntryEditor> {
       if (mounted) {
         setState(() {
           busy = false;
-          error = e.toString();
+          error = recordErrorMessage(e, deleting: true);
         });
       }
     }
@@ -307,7 +319,9 @@ class _EntryEditorState extends State<EntryEditor> {
                     ),
                   if (widget.type != EntryType.bleeding)
                     Text(
-                      widget.type == EntryType.journal
+                      repo.isRemote
+                          ? 'Saved records are private to your signed-in account. Journals are not automatically sent to AI or community.'
+                          : widget.type == EntryType.journal
                           ? 'Journal text stays in this demo session. No AI, clinician or community receives it.'
                           : 'Use fictional observations. This session has no account storage.',
                     ),
@@ -348,8 +362,10 @@ class _EntryEditorState extends State<EntryEditor> {
                             },
                     ),
                   if (isTracking) ...[
-                    const Text(
-                      'Describe what you observed. These choices do not diagnose a condition. Health records last only for this session.',
+                    Text(
+                      repo.isRemote
+                          ? 'Describe what you observed. These choices do not diagnose a condition. Saved observations belong to your private account.'
+                          : 'Describe what you observed. These choices do not diagnose a condition. Health records last only for this session.',
                     ),
                     DropdownButtonFormField<TrackingAmount>(
                       key: const ValueKey('tracking-amount'),
@@ -611,12 +627,9 @@ class _EntryEditorState extends State<EntryEditor> {
                               );
                               if (d != null && mounted) {
                                 setState(() {
-                                  when = DateTime(
-                                    d.year,
-                                    d.month,
-                                    d.day,
-                                    when!.hour,
-                                    when!.minute,
+                                  when = withWallClockComponents(
+                                    when!,
+                                    date: d,
                                   );
                                   dirty = true;
                                 });
@@ -626,7 +639,11 @@ class _EntryEditorState extends State<EntryEditor> {
                   if (widget.type != EntryType.bleeding)
                     OutlinedButton.icon(
                       icon: const Icon(Icons.schedule),
-                      label: Text('Time: ${timeLabel(when!)}'),
+                      label: Text(
+                        observationTimeKnown
+                            ? 'Time: ${timeLabel(when!)}'
+                            : 'Time: not recorded',
+                      ),
                       onPressed: busy
                           ? null
                           : () async {
@@ -636,12 +653,11 @@ class _EntryEditorState extends State<EntryEditor> {
                               );
                               if (t != null && mounted) {
                                 setState(() {
-                                  when = DateTime(
-                                    when!.year,
-                                    when!.month,
-                                    when!.day,
-                                    t.hour,
-                                    t.minute,
+                                  observationTimeKnown = true;
+                                  when = withWallClockComponents(
+                                    when!,
+                                    hour: t.hour,
+                                    minute: t.minute,
                                   );
                                   dirty = true;
                                 });
@@ -727,14 +743,18 @@ class _EntryEditorState extends State<EntryEditor> {
                   if (error != null) ErrorNotice(error!),
                   if (busy)
                     Semantics(
-                      label: 'Saving demo entry',
+                      label: repo.isRemote
+                          ? 'Saving account entry'
+                          : 'Saving demo entry',
                       child: LinearProgressIndicator(),
                     ),
                   FilledButton(
                     key: const ValueKey('save-entry'),
                     onPressed: busy ? null : save,
                     child: Text(
-                      error == null ? 'Save demo entry' : 'Retry save',
+                      error == null
+                          ? (repo.isRemote ? 'Save entry' : 'Save demo entry')
+                          : 'Retry save',
                     ),
                   ),
                   OutlinedButton(
@@ -746,18 +766,19 @@ class _EntryEditorState extends State<EntryEditor> {
                       onPressed: busy ? null : remove,
                       child: const Text('Delete entry'),
                     ),
-                  TextButton(
-                    onPressed: busy
-                        ? null
-                        : () {
-                            repo.failNextWrite = true;
-                            tell(
-                              context,
-                              'Next save or delete will simulate a failure.',
-                            );
-                          },
-                    child: const Text('Demo controls: fail next write'),
-                  ),
+                  if (!repo.isRemote)
+                    TextButton(
+                      onPressed: busy
+                          ? null
+                          : () {
+                              repo.failNextWrite = true;
+                              tell(
+                                context,
+                                'Next save or delete will simulate a failure.',
+                              );
+                            },
+                      child: const Text('Demo controls: fail next write'),
+                    ),
                 ]),
               ),
             ),

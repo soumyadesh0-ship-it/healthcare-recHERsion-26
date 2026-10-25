@@ -78,6 +78,7 @@ void main() {
     final first = await service.assess(answers);
     expect(first.status, ModelQuizStatus.experimental);
     expect(first.bmiImputed, isTrue);
+    expect(first.scoreOutOf100, closeTo(31.4159, .00001));
     tokens.value = 'refreshed-current-token';
     await service.assess(answers);
     expect(seen, [

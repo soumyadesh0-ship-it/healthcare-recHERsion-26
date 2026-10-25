@@ -13,6 +13,8 @@ import '../features/profile/profile.dart';
 import '../features/appointments/doctor.dart';
 import '../features/pcos_quiz/quiz.dart';
 import '../features/logging/editor.dart';
+import '../features/sisterhood/sisterhood.dart';
+import '../features/chat/chat.dart';
 
 enum AppDestination {
   home('Home', Icons.home_outlined),
@@ -80,6 +82,7 @@ class _AppShellState extends State<AppShell> {
 
   Widget page(AppDestination d) => switch (d) {
     AppDestination.home => HomePage(
+      displayName: widget.authUser?.displayName,
       onWellbeing: () => select(AppDestination.wellbeing),
       onQuiz: () => select(AppDestination.quiz),
     ),
@@ -101,7 +104,7 @@ class _AppShellState extends State<AppShell> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: RouteSettings(name: route),
-        builder: (_) => page is UnavailablePage
+        builder: (_) => page is UnavailablePage || page is ChatPage
             ? page
             : Scaffold(
                 appBar: AppBar(title: const AuraCareBrandHeader()),
@@ -187,19 +190,13 @@ class _AppShellState extends State<AppShell> {
                     drawerItem(
                       'AI Assistant',
                       Icons.chat_bubble_outline,
-                      const UnavailablePage(
-                        'AI Assistant',
-                        'No AI or report-processing service is connected. No uploads or health records are sent.',
-                      ),
+                      const ChatPage(),
                       '/app/assistant',
                     ),
                     drawerItem(
                       'Sisterhood',
                       Icons.people_outline,
-                      const UnavailablePage(
-                        'Sisterhood',
-                        'Community and moderation are not connected. Private records are never shared.',
-                      ),
+                      const SisterhoodPage(),
                       '/app/sisterhood',
                     ),
                     ListTile(

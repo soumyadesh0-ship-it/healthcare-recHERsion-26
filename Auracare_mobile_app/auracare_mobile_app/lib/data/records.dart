@@ -64,6 +64,97 @@ String timeLabel(DateTime d) =>
     '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 DateTime dayOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
+/// Edit only selected wall-clock components, retaining precision and representation.
+DateTime withWallClockComponents(
+  DateTime value, {
+  DateTime? date,
+  int? hour,
+  int? minute,
+}) {
+  final year = date?.year ?? value.year,
+      month = date?.month ?? value.month,
+      day = date?.day ?? value.day,
+      h = hour ?? value.hour,
+      m = minute ?? value.minute;
+  if (year == value.year &&
+      month == value.month &&
+      day == value.day &&
+      h == value.hour &&
+      m == value.minute) {
+    return value;
+  }
+  return value.isUtc
+      ? DateTime.utc(
+          year,
+          month,
+          day,
+          h,
+          m,
+          value.second,
+          value.millisecond,
+          value.microsecond,
+        )
+      : DateTime(
+          year,
+          month,
+          day,
+          h,
+          m,
+          value.second,
+          value.millisecond,
+          value.microsecond,
+        );
+}
+
+enum RecordProblem {
+  conflict,
+  notFound,
+  validation,
+  simulatedFailure,
+  closed,
+  cancelled,
+  unavailable,
+  authentication,
+  deployment,
+  busy,
+}
+
+/// Fixed local messages only; never constructed from SDK/transport exception text.
+class RecordFailure extends StateError {
+  RecordFailure(this.problem)
+    : super(switch (problem) {
+        RecordProblem.conflict =>
+          'This entry changed. Reopen it before editing or deleting.',
+        RecordProblem.notFound =>
+          'This entry no longer exists. Your unsaved text is still here.',
+        RecordProblem.validation =>
+          'Check the title and field lengths before saving.',
+        RecordProblem.simulatedFailure =>
+          'Simulated demo failure. Your input is still here. Retry when ready.',
+        RecordProblem.closed =>
+          'This session has ended. Reopen the entry in your current session.',
+        RecordProblem.cancelled =>
+          'This session changed. Your operation was not saved.',
+        RecordProblem.unavailable => 'Health records could not be reached. Your text is still here. Please retry.',
+        RecordProblem.authentication =>
+          'Please sign in again to access your health records.',
+        RecordProblem.deployment => 'Cloud health records are not enabled. Database deployment and validation are required.',
+        RecordProblem.busy =>
+          'A record operation is already in progress. Please wait and retry.',
+      });
+  final RecordProblem problem;
+  String get safeMessage => message;
+  @override
+  String toString() => safeMessage;
+}
+
+String recordErrorMessage(Object error, {required bool deleting}) =>
+    error is RecordFailure
+    ? error.safeMessage
+    : deleting
+    ? 'The entry could not be deleted. Please try again.'
+    : 'The entry could not be saved. Your text is still here. Please try again.';
+
 /// Wall-clock components are recorded with their declared zone; no IANA conversion.
 @immutable
 class HealthEntry {
@@ -81,6 +172,7 @@ class HealthEntry {
     this.periodStart,
     this.periodEnd,
     this.tracking,
+    this.observationTimeKnown = true,
   });
   final String id, title, note, zone;
   final EntryType type;
@@ -93,6 +185,7 @@ class HealthEntry {
   final DateTime? savedAt;
   final bool? periodStart, periodEnd;
   final TrackingDetails? tracking;
+  final bool observationTimeKnown;
 
   FlowIntensity? get flowIntensity {
     if (type != EntryType.bleeding) return null;
@@ -130,12 +223,14 @@ class HealthEntry {
     periodStart: periodStart,
     periodEnd: periodEnd,
     tracking: tracking,
+    observationTimeKnown: observationTimeKnown,
   );
   Map<String, Object?> toJson() => {
     'id': id,
     'type': type.name,
     'title': title,
-    'wallClock': '${dayLabel(when)}T${timeLabel(when)}',
+    'wallClock': observationTimeKnown ? when.toIso8601String() : dayLabel(when),
+    if (!observationTimeKnown) 'observationTimeKnown': false,
     'timezoneLabel': zone,
     'note': note,
     'severity': severity.name,
@@ -147,15 +242,24 @@ class HealthEntry {
     if (tracking != null) 'tracking': tracking!.toJson(),
   };
   String get description =>
-      '${dayLabel(when)} ${timeLabel(when)} · $zone\n$title · ${type.name}'
+      '${dayLabel(when)} ${observationTimeKnown ? timeLabel(when) : 'Time not recorded'} · $zone\n$title · ${type.name}'
       '${tracking == null ? '' : '\n${tracking!.summary}'}'
       '${severity == Severity.unspecified ? '' : ' · ${severity.name}'}${note.isEmpty ? '' : '\n$note'}';
 }
 
 abstract class RecordsRepository extends ChangeNotifier {
   List<HealthEntry> get entries;
+  bool get isRemote => false;
+  bool get loading => false;
+  String? get loadError => null;
+  bool get loaded => true;
+  String newId();
+  Future<void> load() async {}
+  void reset({bool sample = false, DateTime? now});
+  // Demo-only controls are ignored by authenticated repositories.
+  set failNextWrite(bool value) {}
   Future<void> save(HealthEntry entry);
-  Future<void> delete(String id);
+  Future<void> delete(String id, {required int expectedVersion});
 }
 
 /// Keeps all records; only the calendar's summary chooses one value per type.
@@ -181,36 +285,56 @@ class DemoRecordsRepository extends RecordsRepository {
   }
   final List<HealthEntry> _entries = [];
   int _counter = 0;
+  int _generation = 0;
+  bool _disposed = false;
+  @override
   bool failNextWrite = false;
-  String newId() => 'demo-${++_counter}';
+  void _checkActive() {
+    if (_disposed) throw RecordFailure(RecordProblem.closed);
+  }
+
+  @override
+  String newId() {
+    _checkActive();
+    return 'demo-${++_counter}';
+  }
+
   @override
   List<HealthEntry> get entries => List.unmodifiable(
     [..._entries]..sort((a, b) => b.when.compareTo(a.when)),
   );
-  Future<void> _write() async {
+  Future<int> _write() async {
+    _checkActive();
+    final generation = _generation;
     await Future<void>.delayed(const Duration(milliseconds: 280));
+    _checkActive();
+    if (generation != _generation) throw RecordFailure(RecordProblem.cancelled);
     if (failNextWrite) {
       failNextWrite = false;
-      throw StateError(
-        'Simulated demo failure. Your input is still here. Retry when ready.',
-      );
+      throw RecordFailure(RecordProblem.simulatedFailure);
     }
+    return generation;
+  }
+
+  void _checkWrite(int generation) {
+    _checkActive();
+    if (generation != _generation) throw RecordFailure(RecordProblem.cancelled);
   }
 
   @override
   Future<void> save(HealthEntry entry) async {
-    await _write();
+    _checkWrite(await _write());
     if (entry.note.length > 2000 || entry.title.trim().isEmpty) {
-      throw ArgumentError('Check the title and note length.');
+      throw RecordFailure(RecordProblem.validation);
     }
     if ((entry.tracking?.color?.length ?? 0) > 80 ||
         (entry.tracking?.consistency?.length ?? 0) > 80) {
-      throw ArgumentError('Check the observation field lengths.');
+      throw RecordFailure(RecordProblem.validation);
     }
     final index = _entries.indexWhere((e) => e.id == entry.id);
     if (index >= 0) {
       if (entry.version != _entries[index].version + 1) {
-        throw StateError('This entry changed. Reopen it before editing.');
+        throw RecordFailure(RecordProblem.conflict);
       }
       _entries[index] = entry.savedOn(DateTime.now().toUtc());
     } else {
@@ -224,19 +348,29 @@ class DemoRecordsRepository extends RecordsRepository {
           'A flow entry already exists for this date. Reopen it to edit.',
         );
       }
+      // Version 1 is a create; later versions must update an existing record.
+      if (entry.version != 1) throw RecordFailure(RecordProblem.notFound);
       _entries.add(entry.savedOn(DateTime.now().toUtc()));
     }
     notifyListeners();
   }
 
   @override
-  Future<void> delete(String id) async {
-    await _write();
-    _entries.removeWhere((e) => e.id == id);
+  Future<void> delete(String id, {required int expectedVersion}) async {
+    _checkWrite(await _write());
+    final index = _entries.indexWhere((e) => e.id == id);
+    if (index < 0) throw RecordFailure(RecordProblem.notFound);
+    if (_entries[index].version != expectedVersion) {
+      throw RecordFailure(RecordProblem.conflict);
+    }
+    _entries.removeAt(index);
     notifyListeners();
   }
 
+  @override
   void reset({bool sample = false, DateTime? now}) {
+    _checkActive();
+    _generation++;
     _entries.clear();
     failNextWrite = false;
     if (sample) {
@@ -274,6 +408,16 @@ class DemoRecordsRepository extends RecordsRepository {
       ]);
     }
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _generation++;
+    _entries.clear();
+    failNextWrite = false;
+    super.dispose();
   }
 }
 

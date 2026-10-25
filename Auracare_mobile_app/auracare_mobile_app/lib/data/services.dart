@@ -1,5 +1,7 @@
 import 'records.dart';
 import 'articles.dart';
+import 'api_client.dart';
+import 'auth_service.dart';
 
 class ResourcePreview {
   const ResourcePreview(this.topic);
@@ -44,6 +46,7 @@ class QuizAnswers {
   int? age;
   double? kg, cm;
   bool? knownDiagnosis;
+  bool hairThinningRefersToScalp = false;
   final Map<String, int?> binary = {
     for (final key in quizFields.keys) key: null,
   };
@@ -79,6 +82,7 @@ class QuizAnswers {
 }
 
 enum QuizOutcome {
+  summary,
   fixture,
   unavailable,
   failure,
@@ -114,6 +118,77 @@ class LiveUnavailableQuizService implements QuizService {
       QuizOutcome.unavailable;
 }
 
+/// Only these four fields cross the API boundary. Local answers are never mutated.
+class PcosQuestionnaireAdapter {
+  static bool? _boolean(int? value) => switch (value) {
+    1 => true,
+    0 => false,
+    null => null,
+    _ => throw const ApiException(ApiFailure.validation),
+  };
+
+  static PcosSurveyAnswers map(QuizAnswers answers) {
+    final regular = _boolean(answers.binary['regular_periods']);
+    return PcosSurveyAnswers(
+      irregularPeriods: regular == null ? null : !regular,
+      acne: _boolean(answers.binary['acne']),
+      excessHairGrowth: _boolean(answers.binary['excess_hair']),
+      // The legacy question includes general hair loss; scalp scope must be explicit.
+      scalpHairThinning: answers.hairThinningRefersToScalp
+          ? _boolean(answers.binary['hair_thinning'])
+          : null,
+    );
+  }
+}
+
+class AuthenticatedQuizService implements QuizService {
+  AuthenticatedQuizService({required this.auth, required this.createClient})
+    : _userId = auth.userId;
+  final AuraAuthController auth;
+  final String? _userId;
+  final AuraApiClient Function() createClient;
+  AuraApiClient? _client;
+  PcosAssessment? assessment;
+  bool _busy = false, _disposed = false;
+
+  @override
+  Future<QuizOutcome> assess(QuizAnswers answers) async =>
+      throw const ApiException(ApiFailure.forbidden);
+
+  Future<QuizOutcome> assessConfirmed(
+    QuizAnswers answers, {
+    required bool confirmed,
+  }) async {
+    if (!confirmed || _busy) throw const ApiException(ApiFailure.forbidden);
+    if (_disposed ||
+        auth.mode != AccessMode.authenticated ||
+        auth.userId != _userId ||
+        _userId == null) {
+      throw const ApiException(ApiFailure.unauthenticated);
+    }
+    _busy = true;
+    assessment = null;
+    try {
+      final survey = PcosQuestionnaireAdapter.map(answers);
+      final result = await (_client ??= createClient()).predictPcos(survey);
+      if (_disposed ||
+          auth.mode != AccessMode.authenticated ||
+          auth.userId != _userId) {
+        throw const ApiException(ApiFailure.unauthenticated);
+      }
+      assessment = result;
+      return QuizOutcome.summary;
+    } finally {
+      _busy = false;
+    }
+  }
+
+  void dispose() {
+    _disposed = true;
+    _client?.close();
+  }
+}
+
 String appointmentSummary(
   List<HealthEntry> selected,
   List<String> questions, {
@@ -125,7 +200,7 @@ String appointmentSummary(
   final facts = selected
       .map(
         (e) =>
-            '${dayLabel(e.when)} ${timeLabel(e.when)} (${e.zone}) — ${e.title} [${e.type.name}, v${e.version}]'
+            '${dayLabel(e.when)} ${e.observationTimeKnown ? timeLabel(e.when) : 'Time not recorded'} (${e.zone}) — ${e.title} [${e.type.name}, v${e.version}]'
             '${e.tracking == null ? '' : '\n${e.tracking!.summary}'}'
             '${includeNotes && e.note.isNotEmpty ? '\n${e.note}' : ''}',
       )

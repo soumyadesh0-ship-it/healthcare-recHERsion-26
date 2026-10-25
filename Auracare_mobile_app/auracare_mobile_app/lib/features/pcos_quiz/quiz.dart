@@ -4,6 +4,8 @@ import '../../app/session.dart';
 import '../../app/theme.dart';
 import '../../app/quiz_integration.dart';
 import 'flashcard.dart';
+import 'model_result.dart';
+import 'survey_quiz.dart';
 import '../../core/widgets.dart';
 import '../../data/services.dart';
 import '../../data/model_quiz_service.dart';
@@ -39,8 +41,9 @@ class _QuizPageState extends State<QuizPage> {
   QuizOutcome? outcome;
   ModelQuizResult? modelResult;
   bool get live => QuizIntegrationScope.maybeOf(context)?.signedIn ?? false;
-  String get summary =>
-      live ? reportedModelQuizSummary(answers) : answers.summary;
+  String get summary => live
+      ? reportedModelQuizSummary(answers, result: modelResult)
+      : answers.summary;
   QuizOutcome scenario = QuizOutcome.fixture;
   String? validation;
   final fields = quizFields.entries.toList();
@@ -239,6 +242,7 @@ class _QuizPageState extends State<QuizPage> {
           ModelQuizStatus.tracking => 'Continue with your history',
         }
       : switch (outcome!) {
+          QuizOutcome.summary => 'Reported symptom summary',
           QuizOutcome.fixture => 'A summary, not a diagnosis.',
           QuizOutcome.unavailable => 'Live assessment unavailable',
           QuizOutcome.failure => 'Demo service failed',
@@ -258,6 +262,8 @@ class _QuizPageState extends State<QuizPage> {
           ModelQuizStatus.tracking => 'A reported known diagnosis routes to tracking and consultation preparation without rescoring.',
         }
       : switch (outcome!) {
+          QuizOutcome.summary =>
+            'A descriptive count of reported symptoms, not a diagnosis.',
           QuizOutcome.fixture => 'Labeled demonstration fixture. No model was run and this is not a personal result. No risk band or probability is displayed.',
           QuizOutcome.unavailable => 'No verified model service or endpoint is connected. Your answers remain available to edit or copy.',
           QuizOutcome.failure => 'Simulated failure. Your answers are preserved. Retry uses the demonstration fixture, not a model.',
@@ -267,6 +273,10 @@ class _QuizPageState extends State<QuizPage> {
         };
   @override
   Widget build(BuildContext context) {
+    if (SessionScope.of(context).quizService != null &&
+        QuizIntegrationScope.maybeOf(context)?.service == null) {
+      return SurveyQuizPage(embedded: widget.embedded);
+    }
     final screen = '$step-$busy-${outcome?.name}';
     if (visibleScreen != screen) {
       visibleScreen = screen;
@@ -321,10 +331,14 @@ class _QuizPageState extends State<QuizPage> {
     } else if (outcome != null) {
       body.addAll([
         Heading(resultTitle),
-        Panel(color: Palette.lavender, child: Text(resultMessage)),
-        const Text(
-          'Experimental, not diagnostic. Missing or absent symptoms cannot rule out PCOS. Discuss concerns with a qualified healthcare professional.',
-        ),
+        if (live && modelResult?.status == ModelQuizStatus.experimental)
+          PcosModelResult(answers: answers, result: modelResult!)
+        else ...[
+          Panel(color: Palette.lavender, child: Text(resultMessage)),
+          const Text(
+            'Experimental, not diagnostic. Missing or absent symptoms cannot rule out PCOS. Discuss concerns with a qualified healthcare professional.',
+          ),
+        ],
         Panel(child: SelectableText(summary)),
         FilledButton(
           onPressed: () => copyText(context, summary),
@@ -569,7 +583,7 @@ class _QuizPageState extends State<QuizPage> {
             ),
           Text(
             live
-                ? 'Submit only after reviewing your answers. Unknown core inputs produce no model result. Ages outside 18–45 show scope limits; known diagnosis routes to tracking. The numeric research score is not displayed.'
+                ? 'Submit only after reviewing your answers. Unknown core inputs produce no model result. Ages outside 18–45 show scope limits; known diagnosis routes to tracking. The experimental model score is shown out of 100, not as a clinical risk percentage.'
                 : 'Unknown core inputs show insufficient inputs. Ages outside 18–45 show scope limits. Known diagnosis goes to tracking. No scores are calculated.',
           ),
         ]);

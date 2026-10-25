@@ -2,7 +2,33 @@
 
 ## Verified status
 
-No authentication, authorization, data collection, consent system, encryption configuration, secure storage, backup or security test exists. Requirements below are proposed. No compliance or certification is established.
+The FastAPI backend verifies Supabase Bearer tokens for `/chat` and
+`/predict-pcos` through a shared dependency with separate clients/transports per
+request. Survey ownership comes from the verified user. External calls have
+explicit timeouts, errors omit raw exception messages, and responses use
+`Cache-Control: no-store`. Offline automated tests exercise authentication,
+validation, error privacy, concurrent user isolation and chat abuse controls.
+They do not prove deployed database RLS, clinical safety or compliance.
+
+Chat requires an explicit strict-boolean `ai_processing_confirmed: true` for each
+submitted prompt. The client must explain sending that text to Gemini and obtain
+an affirmative action. This is a narrow processing confirmation, not a complete
+consent-management system: there is no stored grant, withdrawal lifecycle,
+recipient/version ledger or legal-consent claim. No automatic record/journal
+context is fetched. The existing medical-safety system instruction is preserved;
+model output still requires safety evaluation before real-user use.
+
+A bounded, thread-safe in-memory chat limiter permits 10 attempts per user per
+60-second window and retains at most 1,024 active users. Capacity exhaustion
+fails closed. It stores no prompts/tokens. It is suitable only for local
+single-process development: restart resets it, and multi-worker/replica production
+requires a shared atomic limiter plus ingress/authentication and global AI cost
+controls. See [implemented API contracts](API_SPECIFICATION.md).
+
+The broader controls below remain requirements unless explicitly described above.
+Transport deployment, encryption/storage, backups, durable consent, privacy
+lifecycles and independent security evaluation are still outstanding. No
+compliance or certification is established.
 
 ## Access, consent and isolation
 

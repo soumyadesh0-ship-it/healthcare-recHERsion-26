@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
 import 'dart:async';
 
 import 'auth_service.dart';
-import 'quiz_integration.dart';
 import 'session.dart';
+import 'quiz_integration.dart';
+
+import 'package:http/http.dart' as http;
+
+import '../core/brand.dart';
+import '../features/profile/profile.dart';
+import '../features/learn/learn.dart';
+import '../features/insights/insights.dart';
+import '../features/chat/chat.dart';
 import 'setup_preference.dart';
 import '../data/records.dart';
 import 'theme.dart';
 import 'shell.dart';
 import 'navigation.dart';
-import '../core/brand.dart';
-import '../features/profile/profile.dart';
-import '../features/learn/learn.dart';
-import '../features/insights/insights.dart';
 import '../features/onboarding/onboarding.dart';
 import '../features/auth/auth.dart';
 
@@ -23,9 +26,15 @@ class AuracareApp extends StatefulWidget {
   const AuracareApp({
     super.key,
     this.session,
-    this.authService,
     this.showOnboarding = true,
+    this.accessWrapper,
+    this.authService,
+    this.externalAuthUser,
+    this.externalSignOut,
   });
+  final Widget Function(BuildContext context, Widget child)? accessWrapper;
+  final AuthUser? externalAuthUser;
+  final Future<void> Function()? externalSignOut;
   final DemoSession? session;
   final AuthService? authService;
   final bool showOnboarding;
@@ -43,6 +52,7 @@ class _AuracareAppState extends State<AuracareApp> {
   StreamSubscription<void>? passwordRecoverySubscription;
   AuthUser? authenticatedUser;
   int authEventVersion = 0;
+  int _navigationEpoch = 0;
   bool completingPasswordRecovery = false;
   String? sessionRestoreMessage;
   late final DemoSession session =
@@ -59,42 +69,55 @@ class _AuracareAppState extends State<AuracareApp> {
   void initState() {
     super.initState();
     loadSetup();
-    authSubscription = auth.sessionChanges.listen(updateAuthUser);
-    passwordRecoverySubscription = auth.passwordRecoveryEvents.listen(
-      (_) => beginPasswordRecovery(),
-    );
+    if (widget.accessWrapper == null) {
+      authSubscription = auth.sessionChanges.listen(updateAuthUser);
+      passwordRecoverySubscription = auth.passwordRecoveryEvents.listen(
+        (_) => beginPasswordRecovery(),
+      );
+    }
   }
 
   Future<void> loadSetup() async {
-    final done = widget.showOnboarding ? await preference.completed() : true;
     final startingVersion = authEventVersion;
+    final done = widget.showOnboarding ? await preference.completed() : true;
+    if (widget.accessWrapper != null) {
+      // AuthenticationRoot owns account boundaries and remote-record loading.
+      if (mounted) {
+        setState(() {
+          entered = done;
+          loading = false;
+        });
+      }
+      return;
+    }
     AuthUser? user;
     try {
       user = await auth.restoreSession();
     } on AuthException {
-      sessionRestoreMessage =
-          'Could not restore the saved sign-in session. Please sign in again.';
+      if (mounted && startingVersion == authEventVersion) {
+        sessionRestoreMessage = 'Could not restore the saved sign-in session. Please sign in again.';
+      }
     }
     if (mounted) {
-      if (user != null && demoMode) session.reset();
+      if (startingVersion == authEventVersion) updateAuthUser(user);
       setState(() {
         entered = done;
-        if (startingVersion == authEventVersion) {
-          authenticatedUser = user;
-          if (user != null) demoMode = false;
-        }
         loading = false;
       });
     }
   }
 
+  void _clearSessionBoundary() {
+    // reset invalidates pending local writes; a new Navigator disposes old editors.
+    session.reset();
+    _navigationEpoch++;
+  }
+
   void updateAuthUser(AuthUser? user) {
     if (!mounted) return;
     authEventVersion++;
-    if (user != null &&
-        (demoMode ||
-            (authenticatedUser != null && authenticatedUser!.id != user.id))) {
-      session.reset();
+    if (authenticatedUser?.id != user?.id || (user != null && demoMode)) {
+      _clearSessionBoundary();
     }
     setState(() {
       authenticatedUser = user;
@@ -104,16 +127,23 @@ class _AuracareAppState extends State<AuracareApp> {
   }
 
   Future<void> beginPasswordRecovery() async {
+    final version = ++authEventVersion;
+    _clearSessionBoundary();
+    setState(() {
+      authenticatedUser = null;
+      demoMode = false;
+      completingPasswordRecovery = false;
+    });
     try {
       final user = await auth.restoreSession();
-      if (!mounted) return;
+      if (!mounted || version != authEventVersion) return;
       setState(() {
         authenticatedUser = user;
         completingPasswordRecovery = user != null;
         demoMode = false;
       });
     } on AuthException {
-      if (!mounted) return;
+      if (!mounted || version != authEventVersion) return;
       setState(() {
         sessionRestoreMessage = 'The password reset link could not be verified. Request a new link and try again.';
         completingPasswordRecovery = false;
@@ -122,12 +152,17 @@ class _AuracareAppState extends State<AuracareApp> {
     }
   }
 
-  Future<void> enter(bool _) async {
+  Future<void> enter(bool sample) async {
     final saved = await preference.complete();
     if (!mounted) return;
+    if (widget.accessWrapper != null &&
+        sample &&
+        session.records.entries.isEmpty) {
+      session.records.reset(sample: true);
+    }
     setState(() {
       entered = true;
-      demoMode = false;
+      demoMode = widget.accessWrapper != null;
     });
     if (!saved) {
       // Unsupported platforms still allow entry; Android persists the flag.
@@ -138,21 +173,26 @@ class _AuracareAppState extends State<AuracareApp> {
   }
 
   void enterDemo(bool sample) {
-    if (sample && session.records.entries.isEmpty) {
-      session.records.reset(sample: true);
-    }
-    setState(() => demoMode = true);
+    authEventVersion++;
+    _clearSessionBoundary();
+    if (sample) session.records.reset(sample: true);
+    setState(() {
+      authenticatedUser = null;
+      completingPasswordRecovery = false;
+      demoMode = true;
+    });
   }
 
   Future<void> signOut() async {
-    await auth.signOut();
-    if (!mounted) return;
-    session.reset();
+    authEventVersion++;
+    _clearSessionBoundary();
     setState(() {
       authenticatedUser = null;
       demoMode = false;
       completingPasswordRecovery = false;
     });
+    // Clear immediately even if SDK sign-out fails or completes after another login.
+    await auth.signOut();
   }
 
   @override
@@ -168,16 +208,15 @@ class _AuracareAppState extends State<AuracareApp> {
   Widget build(BuildContext context) => SessionScope(
     session: session,
     child: QuizIntegrationScope(
-      signedIn: authenticatedUser != null && !demoMode,
-      userId: authenticatedUser?.id,
+      signedIn:
+          widget.externalAuthUser != null ||
+          (authenticatedUser != null && !demoMode),
+      userId: widget.externalAuthUser?.id ?? authenticatedUser?.id,
       service: modelQuizService,
       child: ListenableBuilder(
         listenable: session,
         builder: (context, _) => MaterialApp(
-          title: 'AuraCare',
-          debugShowCheckedModeBanner: false,
-          theme: auracareTheme(),
-          navigatorObservers: [auraRouteObserver],
+          key: ValueKey(_navigationEpoch),
           onGenerateRoute: (settings) {
             final destination = AppDestination.fromRoute(settings.name);
             if (destination == null &&
@@ -185,44 +224,34 @@ class _AuracareAppState extends State<AuracareApp> {
                   '/app/profile',
                   '/app/learn',
                   '/app/insights',
+                  '/app/assistant',
                 }.contains(settings.name)) {
               return null;
             }
             return MaterialPageRoute<void>(
               settings: settings,
               builder: (routeContext) {
-                if (authenticatedUser == null && !demoMode) {
+                if (widget.externalAuthUser == null &&
+                    authenticatedUser == null &&
+                    !demoMode) {
                   return LoginPage(
                     auth: auth,
-                    onAuthenticated: (user) {
-                      updateAuthUser(user);
-                      Navigator.of(routeContext)
-                          .popUntil((route) => route.isFirst);
-                    },
-                    onDemoSelected: (sample) {
-                      enterDemo(sample);
-                      Navigator.of(routeContext)
-                          .popUntil((route) => route.isFirst);
-                    },
+                    onAuthenticated: updateAuthUser,
+                    onDemoSelected: enterDemo,
                   );
                 }
                 if (destination != null) {
                   return AppShell(
                     initialDestination: destination,
-                    authUser: authenticatedUser,
-                    onSignOut: signOut,
+                    authUser: widget.externalAuthUser ?? authenticatedUser,
+                    onSignOut: widget.externalSignOut ?? signOut,
                   );
                 }
+                if (settings.name == '/app/assistant') return const ChatPage();
                 final page = switch (settings.name) {
                   '/app/profile' => ProfilePage(
-                    authUser: authenticatedUser,
-                    onSignOut: () async {
-                      await signOut();
-                      if (routeContext.mounted) {
-                        Navigator.of(routeContext)
-                            .popUntil((route) => route.isFirst);
-                      }
-                    },
+                    authUser: widget.externalAuthUser ?? authenticatedUser,
+                    onSignOut: widget.externalSignOut ?? signOut,
                   ),
                   '/app/learn' => const LearnPage(),
                   _ => const InsightsPage(),
@@ -234,6 +263,10 @@ class _AuracareAppState extends State<AuracareApp> {
               },
             );
           },
+          title: 'AuraCare',
+          debugShowCheckedModeBanner: false,
+          theme: auracareTheme(),
+          navigatorObservers: [auraRouteObserver],
           routes: kDebugMode
               ? {
                   '/debug/onboarding': (context) =>
@@ -263,13 +296,14 @@ class _AuracareAppState extends State<AuracareApp> {
                 debugPrint('[AuraCare layout] $metrics');
               }
             }
-            return MediaQuery(
+            final content = MediaQuery(
               data: media.copyWith(
                 disableAnimations:
                     media.disableAnimations || session.reduceMotion,
               ),
               child: child!,
             );
+            return widget.accessWrapper?.call(context, content) ?? content;
           },
           home: previewOnboarding
               ? Onboarding(
@@ -283,7 +317,15 @@ class _AuracareAppState extends State<AuracareApp> {
                   },
                 )
               : !entered
-              ? Onboarding(onEnter: enter)
+              ? Onboarding(
+                  onEnter: enter,
+                  demoEntry: widget.accessWrapper != null,
+                )
+              : widget.accessWrapper != null
+              ? AppShell(
+                  authUser: widget.externalAuthUser,
+                  onSignOut: widget.externalSignOut,
+                )
               : completingPasswordRecovery
               ? UpdatePasswordPage(
                   auth: auth,
