@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/session.dart';
 import '../../core/widgets.dart';
 import '../../data/services.dart';
+import '../../data/api_client.dart';
 
 class QuizPage extends StatefulWidget {
   const QuizPage({super.key});
@@ -23,6 +24,11 @@ class _QuizPageState extends State<QuizPage> {
   QuizOutcome? outcome;
   QuizOutcome scenario = QuizOutcome.fixture;
   String? validation;
+  String? submissionError;
+  PcosAssessment? assessment;
+  bool confirmed = false;
+  AuthenticatedQuizService? get liveService =>
+      SessionScope.of(context).quizService;
   final fields = quizFields.entries.toList();
   @override
   void dispose() {
@@ -42,6 +48,8 @@ class _QuizPageState extends State<QuizPage> {
         step--;
       }
       validation = null;
+      confirmed = false;
+      assessment = null;
     });
   }
 
@@ -76,26 +84,41 @@ class _QuizPageState extends State<QuizPage> {
 
   Future<void> submit() async {
     if (busy) return;
+    final live = liveService;
+    if (live != null && !confirmed) return;
     setState(() {
       busy = true;
       outcome = null;
       attempt++;
+      submissionError = null;
+      assessment = null;
     });
     final QuizService service = scenario == QuizOutcome.unavailable
         ? LiveUnavailableQuizService()
         : DemoQuizService(scenario: scenario);
     try {
-      final result = await service.assess(answers);
+      final result = live == null
+          ? await service.assess(answers)
+          : await live.assessConfirmed(answers, confirmed: confirmed);
       if (!mounted) return;
       setState(() {
         outcome = result;
+        assessment = live?.assessment;
+        confirmed = false;
         busy = false;
         if (scenario == QuizOutcome.failure) scenario = QuizOutcome.fixture;
       });
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         setState(() {
-          outcome = QuizOutcome.failure;
+          if (live == null) {
+            outcome = QuizOutcome.failure;
+          } else {
+            outcome = null;
+            confirmed = false;
+            submissionError =
+                '${error is ApiException ? error.message : 'The assessment could not be completed.'} Your answers are preserved. A timed-out request may already have been saved; review before submitting again.';
+          }
           busy = false;
         });
       }
@@ -118,6 +141,7 @@ class _QuizPageState extends State<QuizPage> {
       outcome = null;
       step = 7;
       validation = null;
+      confirmed = false;
     });
     tell(
       context,
@@ -144,12 +168,14 @@ class _QuizPageState extends State<QuizPage> {
               answers.binary[key] = option.$1;
               answered.add(key);
               validation = null;
+              confirmed = false;
             }),
           ),
       ],
     ),
   ];
   String get resultTitle => switch (outcome!) {
+    QuizOutcome.summary => 'Reported symptom summary',
     QuizOutcome.fixture => 'A summary, not a diagnosis.',
     QuizOutcome.unavailable => 'Live assessment unavailable',
     QuizOutcome.failure => 'Demo service failed',
@@ -158,6 +184,7 @@ class _QuizPageState extends State<QuizPage> {
     QuizOutcome.tracking => 'Continue with your history',
   };
   String get resultMessage => switch (outcome!) {
+    QuizOutcome.summary => 'This counts reported symptoms only. It is not a diagnosis, PCOS probability or clinical risk classification.',
     QuizOutcome.fixture => 'Labeled demonstration fixture. No model was run and this is not a personal result. No risk band or probability is displayed.',
     QuizOutcome.unavailable => 'No verified model service or endpoint is connected. Your answers remain available to edit or copy.',
     QuizOutcome.failure => 'Simulated failure. Your answers are preserved. Retry uses the demonstration fixture, not a model.',
@@ -167,27 +194,36 @@ class _QuizPageState extends State<QuizPage> {
   };
   @override
   Widget build(BuildContext context) {
+    final live = liveService != null;
     final body = <Widget>[];
     if (busy) {
       body.addAll([
-        const Heading('Submitting demo answers'),
+        Heading(
+          live ? 'Submitting confirmed answers' : 'Submitting demo answers',
+        ),
         Semantics(
-          label: 'Demo service loading',
+          label: live ? 'Assessment loading' : 'Demo service loading',
           child: const LinearProgressIndicator(),
         ),
-        const Text(
-          'Only a demonstration service is being used. No model or remote endpoint is running.',
+        Text(
+          live
+              ? 'Sending only the four disclosed survey fields to your account. No trained model is used.'
+              : 'Only a demonstration service is being used. No model or remote endpoint is running.',
         ),
       ]);
     } else if (step < 0 && outcome == null) {
       body.addAll([
         const Heading('Make room for\nyour questions.'),
-        const Text(
-          'Experimental PCOS questionnaire · synthetic demo. It cannot diagnose or rule out PCOS and does not estimate your chance of having it.',
+        Text(
+          live
+              ? 'PCOS survey summary · authenticated account. It cannot diagnose or rule out PCOS and does not estimate your chance of having it. Use fictional answers only.'
+              : 'Experimental PCOS questionnaire · synthetic demo. It cannot diagnose or rule out PCOS and does not estimate your chance of having it.',
         ),
-        const Panel(
+        Panel(
           child: Text(
-            'No model or backend exists in this checkout. Use fictional answers only. This flow demonstrates questions, review and service states; nothing is uploaded or saved after restart.',
+            live
+                ? 'Use fictional answers only. After you review and confirm, four supported fields are sent to FastAPI and saved to your account as a draft symptom summary. No trained model is used.'
+                : 'Synthetic demo only. No remote assessment is submitted. Use fictional answers only; answers remain local.',
           ),
         ),
         const Text(
@@ -195,7 +231,9 @@ class _QuizPageState extends State<QuizPage> {
         ),
         FilledButton(
           onPressed: () => setState(() => step = 0),
-          child: const Text('Begin demo questionnaire'),
+          child: Text(
+            live ? 'Begin questionnaire' : 'Begin demo questionnaire',
+          ),
         ),
         OutlinedButton(
           onPressed: synthetic,
@@ -206,10 +244,30 @@ class _QuizPageState extends State<QuizPage> {
       body.addAll([
         Heading(resultTitle),
         ErrorNotice(resultMessage),
+        if (assessment != null)
+          Panel(
+            child: SelectableText(
+              'Reported symptoms: ${assessment!.riskScore}\n'
+              'Known answers: ${assessment!.answeredQuestions} of ${assessment!.totalQuestions}\n'
+              '${assessment!.prediction == 'insufficient_data' ? 'Partial summary: missing answers remain unknown.\n' : ''}'
+              'Reported fields: ${assessment!.reportedSymptoms.isEmpty ? 'None' : assessment!.reportedSymptoms.join(', ')}\n'
+              'Method: ${assessment!.methodVersion}\nDraft assessment: ${assessment!.assessmentId}\n'
+              'Limitations: ${assessment!.limitations}',
+            ),
+          ),
         const Text(
           'Experimental, not diagnostic. Missing or absent symptoms cannot rule out PCOS. Discuss concerns with a qualified healthcare professional.',
         ),
-        Panel(child: SelectableText(answers.summary)),
+        Panel(
+          child: SelectableText(
+            live
+                ? answers.summary.replaceFirst(
+                    'synthetic demo',
+                    'reported answers',
+                  )
+                : answers.summary,
+          ),
+        ),
         FilledButton(
           onPressed: () => copyText(context, answers.summary),
           child: const Text('Copy reported-answer summary'),
@@ -390,35 +448,68 @@ class _QuizPageState extends State<QuizPage> {
               icon: Icons.edit_outlined,
               onTap: () => setState(() => step = i + 1),
             ),
-          DropdownButtonFormField<QuizOutcome>(
-            itemHeight: null,
-            initialValue: scenario,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Demo service scenario',
+          if (!live)
+            DropdownButtonFormField<QuizOutcome>(
+              itemHeight: null,
+              initialValue: scenario,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Demo service scenario',
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: QuizOutcome.fixture,
+                  child: Text('Labeled fixture (no model)'),
+                ),
+                DropdownMenuItem(
+                  value: QuizOutcome.failure,
+                  child: Text('Fail once, then retry fixture'),
+                ),
+                DropdownMenuItem(
+                  value: QuizOutcome.unavailable,
+                  child: Text('Live service unavailable'),
+                ),
+              ],
+              onChanged: busy ? null : (v) => setState(() => scenario = v!),
             ),
-            items: const [
-              DropdownMenuItem(
-                value: QuizOutcome.fixture,
-                child: Text('Labeled fixture (no model)'),
+          if (live) ...[
+            const Text(
+              'Only irregular periods (the inverse of regular periods), acne, excess hair growth and scalp hair thinning are sent. Age, BMI, weight gain, skin darkening and known diagnosis stay local and are not considered by the backend. Unknown answers stay unknown.',
+            ),
+            CheckboxListTile(
+              key: const ValueKey('scalp-scope'),
+              title: const Text('My hair thinning answer refers to scalp hair'),
+              subtitle: const Text(
+                'The original question includes general hair loss. Unless confirmed here, scalp hair thinning is sent as unknown.',
               ),
-              DropdownMenuItem(
-                value: QuizOutcome.failure,
-                child: Text('Fail once, then retry fixture'),
+              value: answers.hairThinningRefersToScalp,
+              onChanged: (value) => setState(() {
+                answers.hairThinningRefersToScalp = value ?? false;
+                confirmed = false;
+              }),
+            ),
+            CheckboxListTile(
+              key: const ValueKey('pcos-confirm'),
+              title: const Text(
+                'I confirm sending these four survey fields and saving a draft summary to my account.',
               ),
-              DropdownMenuItem(
-                value: QuizOutcome.unavailable,
-                child: Text('Live service unavailable'),
-              ),
-            ],
-            onChanged: busy ? null : (v) => setState(() => scenario = v!),
-          ),
-          const Text(
-            'Unknown core inputs show insufficient inputs. Ages outside 18–45 show scope limits. Known diagnosis goes to tracking. No scores are calculated.',
+              value: confirmed,
+              onChanged: (value) => setState(() => confirmed = value ?? false),
+            ),
+          ],
+          Text(
+            live
+                ? 'At least one supported answer must be known. The result counts symptoms only; unsupported answers are retained locally.'
+                : 'Unknown core inputs show insufficient inputs. Ages outside 18–45 show scope limits. Known diagnosis goes to tracking. No scores are calculated.',
           ),
         ]);
       }
       if (validation != null) body.add(ErrorNotice(validation!));
+      if (submissionError != null) {
+        body.add(
+          Semantics(liveRegion: true, child: ErrorNotice(submissionError!)),
+        );
+      }
       if (busy) {
         body.add(
           Semantics(
@@ -429,7 +520,8 @@ class _QuizPageState extends State<QuizPage> {
       }
       body.add(
         FilledButton(
-          onPressed: busy
+          key: const ValueKey('pcos-submit'),
+          onPressed: busy || (live && step == 7 && !confirmed)
               ? null
               : step == 7
               ? submit
@@ -438,7 +530,9 @@ class _QuizPageState extends State<QuizPage> {
             busy
                 ? 'Submitting demo…'
                 : step == 7
-                ? 'Submit demo answers'
+                ? live
+                      ? 'Submit confirmed answers'
+                      : 'Submit demo answers'
                 : 'Next',
           ),
         ),

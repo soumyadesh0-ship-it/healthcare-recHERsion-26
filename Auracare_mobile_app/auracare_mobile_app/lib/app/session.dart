@@ -8,12 +8,14 @@ class DemoSession extends ChangeNotifier {
   DemoSession({
     DemoRecordsRepository? records,
     AppointmentsRepository? appointments,
+    this.quizService,
   }) : records = records ?? DemoRecordsRepository(),
        appointments = appointments ?? AppointmentsRepository() {
     this.records.addListener(notifyListeners);
     this.appointments.addListener(notifyListeners);
   }
   final DemoRecordsRepository records;
+  final AuthenticatedQuizService? quizService;
   final AppointmentsRepository appointments;
   bool showCycleEstimates = false, unsuitableCycleEstimates = false;
   final ResourcesRepository resources = PreviewResourcesRepository();
@@ -52,6 +54,7 @@ class DemoSession extends ChangeNotifier {
 
   @override
   void dispose() {
+    quizService?.dispose();
     records.removeListener(notifyListeners);
     records.dispose();
     appointments.removeListener(notifyListeners);

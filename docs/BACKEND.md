@@ -2,7 +2,15 @@
 
 ## Verified status
 
-No server, runtime, package manifest, database, migrations, API handlers, authentication, environment configuration or jobs exist. No backend technology is selected. All services below are proposed.
+`service/main.py` implements FastAPI `/chat` and `/predict-pcos` with shared
+Supabase Bearer-token authentication, safe errors and explicit upstream timeouts.
+Chat additionally requires per-prompt AI-processing confirmation and uses a
+bounded single-process user rate limiter. Survey output remains a non-diagnostic
+symptom count; the experimental ML model is not integrated. Dependency manifests,
+offline pytest tests and SQL migration files exist. Applied database state is
+unverified and Flutter remains disconnected. See the
+[implemented API specification](API_SPECIFICATION.md) and
+[security limits](SECURITY_AND_PRIVACY.md). Broader services below are proposed.
 
 | Domain | Responsibilities |
 | --- | --- |

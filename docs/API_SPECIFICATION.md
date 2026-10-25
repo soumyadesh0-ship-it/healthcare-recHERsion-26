@@ -1,8 +1,96 @@
 # API specification
 
-## Status and common contract
+## Implemented FastAPI API
 
-**All endpoints below are proposed; none is implemented.** Draft prefix `/api/v1`. JSON except protected file transfers. Session technology is undecided. Private requests require verified server identity, owner/role authorization, input validation and any required purpose/recipient grant. Derive owner from session; reject client owner IDs. Public reads expose only published data.
+`service/main.py` implements the following routes without an `/api/v1` prefix.
+Interactive schemas are available at `/docs` and `/openapi.json`. Flutter is not
+connected. The experimental PCOS ML model is not used.
+
+Both POST routes require `Authorization: Bearer <Supabase access token>`. A shared
+dependency verifies the token with Supabase Auth, derives the user ID from that
+response, and creates a fresh user-authorized Supabase client per request. Clients
+do not persist sessions or refresh tokens; their HTTP transport is closed after
+the request. There is no client-supplied owner field.
+
+| Route | Request | Success |
+| --- | --- | --- |
+| `POST /chat` | `prompt`: strict string, whitespace-trimmed, 1–10,000 characters; required `ai_processing_confirmed`: strict boolean, must be `true` | `200 {"response":"..."}` |
+| `POST /predict-pcos` | Optional nullable strict booleans: `irregular_periods`, `acne`, `excess_hair_growth`, `scalp_hair_thinning`; at least one known answer | `201` survey summary, saved as a draft assessment |
+
+Both bodies reject extra fields. Chat's confirmation applies only to sending the
+exact prompt in that request to Gemini. Clients must explain that external AI
+processing and obtain an affirmative user action before setting it; it is not a
+complete consent system, legal consent record, standing grant, or permission to
+include journals/records automatically. Omission or a non-boolean yields `422`;
+`false` yields `403`. No Gemini request occurs without confirmation and valid auth.
+
+Synthetic chat request (with a valid test-account Bearer token):
+
+```json
+{"prompt":"What general questions could I ask a clinician?","ai_processing_confirmed":true}
+```
+
+Chat sends only the supplied prompt, plus the unchanged medical-safety system
+instruction, to `gemini-2.5-flash`, with at most 2,048 output tokens. It must identify
+itself as AI, avoid diagnosis/prescribing/clinical-validation claims, acknowledge
+uncertainty and encourage qualified medical care. These instructions do not prove
+clinical safety or guarantee model compliance. No conversation storage exists.
+
+Survey response fields: `assessment_id` (UUID), `prediction` (`survey_summary` for
+four known answers, otherwise `insufficient_data`), `risk_score` (count of true
+answers, 0–4), `answered_questions`, `total_questions` (4), `reported_symptoms`,
+`method_version` (`survey-count-v1`), and `limitations`. Partial submissions are
+saved; null stays unknown. The count is not a PCOS probability or clinical risk
+classification. A draft in `pcos_assessments` stores the authenticated owner,
+UTC assessment date and JSON-serialized survey/summary in its observations text.
+
+### Implemented errors, limits and configuration
+
+Errors use `{"detail":"safe message"}`, not the proposed envelope below. All
+responses, including errors, use `Cache-Control: no-store`; validation errors omit
+submitted values. Raw SDK/internal exception messages are not returned.
+
+| Status | Meaning |
+| --- | --- |
+| `401` | Missing/wrong Bearer scheme, invalid/expired token or missing authenticated user; `WWW-Authenticate: Bearer` |
+| `403` | AI processing confirmation is explicitly false |
+| `422` | Invalid body/types/limits, missing confirmation or no known survey answers |
+| `429` | Chat user budget exhausted; `Retry-After` seconds |
+| `502` | Gemini non-retryable/upstream failure, malformed or empty text response |
+| `503` | Auth/network/timeout failure, upstream auth rate limit/server failure, assessment save failure, missing Gemini configuration, Gemini network/timeout/rate-limit/server failure, or limiter capacity exhausted |
+| `500` | Unexpected internal failure with a generic message |
+
+Supabase Auth and PostgREST use an explicit 10-second HTTP timeout per network
+phase (connect/read/write/pool), not a total request deadline. Gemini uses a
+30,000-ms SDK request timeout and one attempt (automatic retries disabled).
+
+Chat has a thread-safe fixed-window budget of 10 attempted AI calls per verified
+user ID per 60 seconds, beginning with that user's first admitted attempt. Failed
+AI calls consume budget; invalid/unconfirmed requests and missing AI configuration
+do not. Token rotation does not reset the user budget. At most 1,024 active user
+windows are retained; expired windows are pruned on access. At capacity, new users
+receive `503` and `Retry-After` without evicting current budgets. State contains
+only user IDs, window expiry times and counts; no prompts or tokens.
+
+This is a **single-process local-development limiter**. Restarts reset it and
+workers/replicas have separate budgets. Production needs a shared atomic limiter,
+global/provider cost budgets and ingress protections; authentication itself is not
+rate-limited by this chat limiter.
+
+Backend startup requires `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+`GEMINI_API_KEY` is server-only and required when using chat. See `.env.example`;
+never substitute a service-role key. Tests mock all external services:
+
+```powershell
+python -m pip install -r service/requirements-test.txt
+python -B -m pytest service/tests -v -p no:cacheprovider
+```
+
+No database migration or deployed RLS verification is implied by these tests.
+
+## Proposed broader API: status and common contract
+
+**All endpoints below are proposed; none of these broader routes is implemented.** Draft prefix `/api/v1`. JSON except protected file transfers. Broader session and consent workflows remain undecided. Private requests require verified server identity, owner/role authorization, input validation and any required purpose/recipient grant. Derive owner from session; reject client owner IDs. Public reads expose only published data.
 
 Lists use bounded date ranges/limits and opaque cursors: `{items,nextCursor}`. Private entries return `{id,version,createdAt,updatedAt,...validatedFields}`. Updates require expectedVersion; side effects require idempotency keys. Health responses use private/no-store. Define CSRF/origin handling for cookie sessions. Rate limits are required per account/IP/operation, stricter for AI/uploads/bookings/posts/reports; numerical budgets remain undecided. 429 includes Retry-After.
 

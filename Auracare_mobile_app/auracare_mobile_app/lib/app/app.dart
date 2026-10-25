@@ -10,7 +10,13 @@ import 'navigation.dart';
 import '../features/onboarding/onboarding.dart';
 
 class AuracareApp extends StatefulWidget {
-  const AuracareApp({super.key, this.session, this.showOnboarding = true});
+  const AuracareApp({
+    super.key,
+    this.session,
+    this.showOnboarding = true,
+    this.accessWrapper,
+  });
+  final Widget Function(BuildContext context, Widget child)? accessWrapper;
   final DemoSession? session;
   final bool showOnboarding;
   @override
@@ -104,13 +110,14 @@ class _AuracareAppState extends State<AuracareApp> {
               debugPrint('[AuraCare layout] $metrics');
             }
           }
-          return MediaQuery(
+          final content = MediaQuery(
             data: media.copyWith(
               disableAnimations:
                   media.disableAnimations || session.reduceMotion,
             ),
             child: child!,
           );
+          return widget.accessWrapper?.call(context, content) ?? content;
         },
         home: previewOnboarding
             ? Onboarding(

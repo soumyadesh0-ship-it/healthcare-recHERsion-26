@@ -1,5 +1,13 @@
 # Auracare mobile demo
 
+Supabase email/password account entry is implemented. See [authentication configuration and verification limits](../../docs/FLUTTER_AUTHENTICATION.md). Health screens remain local synthetic features; login never uploads records. Google sign-in remains disabled. Historical UI-only notes below predate authentication.
+
+The authenticated PCOS questionnaire can now submit four disclosed fields after
+explicit confirmation. See [mapping, behavior and verification limits](../../docs/FLUTTER_PCOS_INTEGRATION.md).
+Other health records remain local. See [network configuration](../../docs/FLUTTER_NETWORKING.md).
+The runtime dependencies now include `http`; older validation notes below describe
+the earlier UI-only implementation.
+
 Current game, spotting/discharge and fictional directory: [implementation and verification](../../docs/AURACARE_UNWIND_TRACKING.md). No new dependencies. Health/game state remains session-only.
 
 Phase 3 features, data handling, sources and verification: [Cycle estimates, Doctor and Learn](../../docs/AURACARE_PHASE3.md). Doctor appointments now persist in app-private Android storage; the original health records remain session-only.
@@ -67,3 +75,4 @@ Timezones: device-local wall clock or explicit UTC for new entries. Existing dat
 Quiz keys follow the supplied brief, not a verified local model contract. Unknown answers stay null; known diagnosis routes to tracking. Demo fixtures run no model and show no risk band/percentage. Replace the service only after contract/privacy/safety validation; no speculative endpoint is configured.
 
 See [Mobile UI handoff](../../docs/MOBILE_UI_HANDOFF.md) for the audit, scope checklist, command results, overrides and remaining integration work.
+
