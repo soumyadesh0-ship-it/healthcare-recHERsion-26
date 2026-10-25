@@ -21,6 +21,19 @@ class _MergeGamePageState extends State<MergeGamePage>
   Duration? lastTick;
   ModalRoute<dynamic>? observedRoute;
   double aim = 50;
+  bool sliderGesture = false;
+  bool boardGesture = false;
+  void finishBoardGesture() {
+    final intentional = boardGesture;
+    boardGesture = false;
+    if (intentional) drop();
+  }
+
+  double clampAim(double value) {
+    final r = MergeWorld.radiusFor(world.nextValue);
+    return value.clamp(r, MergeWorld.width - r);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +65,8 @@ class _MergeGamePageState extends State<MergeGamePage>
   }
 
   void pause() {
+    sliderGesture = false;
+    boardGesture = false;
     world.paused = true;
     ticker.stop();
     lastTick = null;
@@ -90,7 +105,7 @@ class _MergeGamePageState extends State<MergeGamePage>
   }
 
   void drop() {
-    if (world.drop(aim)) setState(() {});
+    if (world.drop(aim)) setState(() => aim = clampAim(aim));
   }
 
   Future<void> restart() async {
@@ -159,25 +174,44 @@ class _MergeGamePageState extends State<MergeGamePage>
                 child: GestureDetector(
                   key: const ValueKey('merge-board'),
                   onTapDown: (d) {
+                    boardGesture = world.canDrop;
                     if (world.canDrop) {
                       setState(
                         () => aim =
                             (d.localPosition.dx / constraints.maxWidth * 100)
-                                .clamp(0, 100),
+                                .clamp(
+                                  MergeWorld.radiusFor(world.nextValue),
+                                  100 - MergeWorld.radiusFor(world.nextValue),
+                                ),
                       );
                     }
                   },
-                  onTapUp: (_) => drop(),
+                  onTapUp: (_) => finishBoardGesture(),
+                  onTapCancel: () => boardGesture = false,
+                  onPanStart: (d) {
+                    boardGesture = world.canDrop;
+                    if (boardGesture) {
+                      setState(
+                        () => aim = clampAim(
+                          d.localPosition.dx / constraints.maxWidth * 100,
+                        ),
+                      );
+                    }
+                  },
+                  onPanCancel: () => boardGesture = false,
                   onPanUpdate: (d) {
                     if (world.canDrop) {
                       setState(
                         () => aim =
                             (d.localPosition.dx / constraints.maxWidth * 100)
-                                .clamp(0, 100),
+                                .clamp(
+                                  MergeWorld.radiusFor(world.nextValue),
+                                  100 - MergeWorld.radiusFor(world.nextValue),
+                                ),
                       );
                     }
                   },
-                  onPanEnd: (_) => drop(),
+                  onPanEnd: (_) => finishBoardGesture(),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: CustomPaint(
@@ -227,8 +261,16 @@ class _MergeGamePageState extends State<MergeGamePage>
                 value: aim,
                 min: 0,
                 max: 100,
+                onChangeStart: world.canDrop
+                    ? (_) => sliderGesture = true
+                    : null,
+                onChangeEnd: (_) {
+                  final intentional = sliderGesture;
+                  sliderGesture = false;
+                  if (intentional) drop();
+                },
                 onChanged: world.canDrop
-                    ? (v) => setState(() => aim = v)
+                    ? (v) => setState(() => aim = clampAim(v))
                     : null,
               ),
             ),

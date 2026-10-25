@@ -1,0 +1,216 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+
+import '../../app/navigation.dart';
+import '../../app/theme.dart';
+import '../../core/widgets.dart';
+
+/// A monotonic, frame-independent clock. Ticker frames only refresh its display.
+class BreathingClock {
+  Duration duration = const Duration(minutes: 1);
+  Duration elapsed = Duration.zero;
+  Duration? anchor;
+  bool get running => anchor != null;
+  bool get complete => elapsed >= duration;
+  void update(Duration now) {
+    if (anchor == null) return;
+    elapsed += now - anchor!;
+    anchor = now;
+    if (elapsed >= duration) {
+      elapsed = duration;
+      anchor = null;
+    }
+  }
+
+  void start(Duration now) {
+    if (!complete) anchor = now;
+  }
+
+  void pause(Duration now) {
+    update(now);
+    anchor = null;
+  }
+
+  void reset() {
+    elapsed = Duration.zero;
+    anchor = null;
+  }
+}
+
+class BreathingSection extends StatefulWidget {
+  const BreathingSection({super.key});
+  @override
+  State<BreathingSection> createState() => _BreathingSectionState();
+}
+
+class _BreathingSectionState extends State<BreathingSection>
+    with
+        SingleTickerProviderStateMixin,
+        WidgetsBindingObserver,
+        RouteAware,
+        AutomaticKeepAliveClientMixin {
+  final clock = BreathingClock();
+  late final Ticker ticker;
+  ModalRoute<dynamic>? route;
+  Duration get now => SchedulerBinding.instance.currentSystemFrameTimeStamp;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    ticker = createTicker((_) {
+      setState(() => clock.update(now));
+      if (!clock.running) ticker.stop();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = ModalRoute.of(context);
+    if (route != next) {
+      auraRouteObserver.unsubscribe(this);
+      route = next;
+      if (next != null) auraRouteObserver.subscribe(this, next);
+    }
+  }
+
+  void pause() {
+    clock.pause(now);
+    ticker.stop();
+    if (mounted) setState(() {});
+  }
+
+  void start() {
+    clock.start(now);
+    if (clock.running) ticker.start();
+    setState(() {});
+  }
+
+  @override
+  void didPushNext() => pause();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) pause();
+  }
+
+  @override
+  void deactivate() {
+    clock.pause(now);
+    ticker.stop();
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    ticker.dispose();
+    auraRouteObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final seconds = clock.elapsed.inMilliseconds / 1000;
+    final phase = seconds % 10;
+    final inward = phase < 4;
+    final progress = inward ? phase / 4 : 1 - (phase - 4) / 6;
+    final remaining = (clock.duration - clock.elapsed).inMilliseconds;
+    final left = (remaining / 1000).ceil();
+    return Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: spaced([
+          const Heading('Breathing pause'),
+          const Text(
+            'Follow along gently, or breathe at your own comfortable pace.',
+          ),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final minutes in [1, 3, 5])
+                ChoiceChip(
+                  label: Text('$minutes min'),
+                  selected: clock.duration.inMinutes == minutes,
+                  onSelected: clock.running
+                      ? null
+                      : (_) => setState(() {
+                          clock.reset();
+                          clock.duration = Duration(minutes: minutes);
+                        }),
+                ),
+            ],
+          ),
+          Text(
+            '${left ~/ 60}:${(left % 60).toString().padLeft(2, '0')}',
+            key: const ValueKey('breathing-remaining'),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          Center(
+            child: SizedBox(
+              width: 120,
+              height: 120,
+              child: Center(
+                child: Transform.scale(
+                  scale: MediaQuery.disableAnimationsOf(context)
+                      ? 1
+                      : .65 + .35 * progress,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Palette.lavender,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              clock.complete
+                  ? 'Your pause is complete. Take your time.'
+                  : inward
+                  ? 'Breathe in'
+                  : 'Breathe out',
+              key: const ValueKey('breathing-guidance'),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton(
+                onPressed: clock.complete
+                    ? null
+                    : clock.running
+                    ? pause
+                    : start,
+                child: Text(
+                  clock.running
+                      ? 'Pause breathing'
+                      : clock.elapsed == Duration.zero
+                      ? 'Start'
+                      : 'Resume breathing',
+                ),
+              ),
+              OutlinedButton(
+                onPressed: () {
+                  ticker.stop();
+                  setState(clock.reset);
+                },
+                child: const Text('Reset'),
+              ),
+            ],
+          ),
+        ]),
+      ),
+    );
+  }
+}

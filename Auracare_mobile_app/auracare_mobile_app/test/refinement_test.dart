@@ -228,12 +228,23 @@ void main() {
         AuracareApp(session: session, showOnboarding: false),
       );
       await tester.pumpAndSettle();
-      await reveal(tester, find.text('Wellbeing check-in'));
-      await tester.tap(find.text('Wellbeing check-in'));
+      await reveal(tester, find.text('Log entry'));
+      await tester.tap(find.text('Log entry'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Happy'));
-      await reveal(tester, find.text('Continue'));
-      await tester.tap(find.text('Continue'));
+      await reveal(tester, find.text('Mood'));
+      await tester.tap(find.text('Mood'));
+      await tester.pumpAndSettle();
+      final metric = find.byType(DropdownButtonFormField<String>);
+      await reveal(tester, metric);
+      await tester.tap(metric);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mood').last);
+      await tester.pumpAndSettle();
+      final feeling = find.byType(DropdownButtonFormField<RecordedMood>);
+      await reveal(tester, feeling);
+      await tester.tap(feeling);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Happy').last);
       await tester.pumpAndSettle();
       session.records.failNextWrite = true;
       await reveal(tester, find.byKey(const ValueKey('save-entry')));
@@ -287,7 +298,10 @@ void main() {
         return ((x > y ? x : y) + .05) / ((x < y ? x : y) + .05);
       }
 
-      expect(contrast(Palette.mist, Palette.purple), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(Palette.ink, Palette.lavender),
+        greaterThanOrEqualTo(4.5),
+      );
       expect(
         contrast(Palette.action, Palette.white),
         greaterThanOrEqualTo(4.5),

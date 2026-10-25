@@ -66,69 +66,30 @@ void main() {
     },
   );
 
-  testWidgets(
-    'chosen mood reaches existing editor and saves through the record repository',
-    (tester) async {
-      final session = DemoSession(
-        records: DemoRecordsRepository(sample: false),
-      );
-      addTearDown(session.dispose);
-      await tester.pumpWidget(
-        SessionScope(
-          session: session,
-          child: MaterialApp(
-            theme: auracareTheme(),
-            home: const MoodCheckInPage(),
-          ),
+  testWidgets('mood feedback stays on the screen without creating a record', (
+    tester,
+  ) async {
+    final session = DemoSession(records: DemoRecordsRepository(sample: false));
+    addTearDown(session.dispose);
+    await tester.pumpWidget(
+      SessionScope(
+        session: session,
+        child: MaterialApp(
+          theme: auracareTheme(),
+          home: const MoodCheckInPage(),
         ),
-      );
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Continue'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(
-        tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Continue'))
-            .onPressed,
-        isNull,
-      );
-      await tester.scrollUntilVisible(
-        find.text('Calm'),
-        -200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      final calmTile = find
-          .ancestor(of: find.text('Calm'), matching: find.byType(InkWell))
-          .first;
-      await tester.ensureVisible(calmTile);
-      await tester.pumpAndSettle();
-      await tester.tap(calmTile);
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Continue'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Continue'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
-      await tester.pumpAndSettle();
-      expect(find.text('Feeling: Calm. '), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('save-entry')),
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.tap(find.byKey(const ValueKey('save-entry')));
-      await tester.pumpAndSettle();
-      expect(session.records.entries.single.type, EntryType.wellness);
-      expect(session.records.entries.single.title, 'Mood');
-      expect(session.records.entries.single.note, 'Feeling: Calm.');
-    },
-  );
-
+      ),
+    );
+    await tester.pumpAndSettle();
+    final tile = find.byKey(const ValueKey('mood-3'));
+    await tester.ensureVisible(tile);
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('mood-feedback')), findsOneWidget);
+    expect(find.byType(MoodCheckInPage), findsOneWidget);
+    expect(session.records.entries, isEmpty);
+    expect(find.text('Save demo entry'), findsNothing);
+  });
   testWidgets(
     'calendar marks recorded days, selects dates, and navigates months',
     (tester) async {

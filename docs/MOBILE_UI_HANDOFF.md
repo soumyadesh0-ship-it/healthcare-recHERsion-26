@@ -1,5 +1,7 @@
 # Mobile UI handoff
 
+> Current update: [Wellbeing controls and screenshot palette](AURACARE_WELLBEING_CONTROLS.md) supersedes the earlier palette and mood interaction. Includes slider release-to-drop, ephemeral six-mood feedback and the breathing timer.
+
 > Latest mobile extension (25 October 2026): the ball-merging game, spotting/discharge fields and fictional directory are implemented in the existing app. Current files, rules, data lifetimes and 68-test/build results are in [Merge & Unwind / tracking handoff](AURACARE_UNWIND_TRACKING.md). The original audit below is historical and is not the current implementation status.
 
 ## Audit and authority (2026-10-25)

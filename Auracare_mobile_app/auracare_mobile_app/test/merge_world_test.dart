@@ -105,6 +105,7 @@ void main() {
     expect(stack.gameOver, isFalse);
     simulate(stack, 8);
     expect(stack.gameOver, isTrue);
+    expect(stack.drop(50), isFalse);
   });
   test(
     'pause and restart freeze/reset simulation; previews only roll 1 through 5',
@@ -117,6 +118,7 @@ void main() {
       world.drop(1);
       final y = world.balls.single.y;
       world.paused = true;
+      expect(world.drop(50), isFalse);
       simulate(world, 2);
       expect(world.balls.single.y, y);
       expect(world.drop(70), isFalse);

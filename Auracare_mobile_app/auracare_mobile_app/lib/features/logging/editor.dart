@@ -6,6 +6,7 @@ import '../../core/characters.dart';
 import '../../app/theme.dart';
 import '../../data/records.dart';
 import '../wellbeing/merge_game.dart';
+import '../wellbeing/breathing.dart';
 
 void openEditor(
   BuildContext context, {
@@ -638,9 +639,7 @@ class LogEntryPage extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             trailing: const Icon(Icons.arrow_forward, size: 20),
-            onTap: () => item.$2 == EntryType.wellness
-                ? pushPage(context, const MoodCheckInPage())
-                : openEditor(context, type: item.$2),
+            onTap: () => openEditor(context, type: item.$2),
           ),
         ),
     ],
@@ -655,13 +654,44 @@ class MoodCheckInPage extends StatefulWidget {
 
 class _MoodCheckInPageState extends State<MoodCheckInPage> {
   int? selected;
+  final breathingKey = GlobalKey();
   static const moods = [
-    ('Happy', AuraCharacter.flower, AuraMood.happy),
-    ('Calm', AuraCharacter.diamond, AuraMood.calm),
-    ('Sad', AuraCharacter.cloud, AuraMood.sad),
-    ('Anxious', AuraCharacter.circle, AuraMood.anxious),
-    ('Tired', AuraCharacter.blob, AuraMood.tired),
-    ('Energetic', AuraCharacter.square, AuraMood.energetic),
+    (
+      'Happy',
+      AuraCharacter.flower,
+      AuraMood.happy,
+      'Yay! Enjoy this little bright moment in your day.',
+    ),
+    (
+      'Sad',
+      AuraCharacter.cloud,
+      AuraMood.sad,
+      'It’s okay to have a quiet day. Be kind to yourself.',
+    ),
+    (
+      'Tired',
+      AuraCharacter.blob,
+      AuraMood.tired,
+      'You can take things slowly. A little pause is okay.',
+    ),
+    (
+      'Calm',
+      AuraCharacter.diamond,
+      AuraMood.calm,
+      'Lovely. Take a gentle breath in, then breathe out.',
+    ),
+    (
+      'Anxious',
+      AuraCharacter.circle,
+      AuraMood.anxious,
+      'One small pause at a time. Try a breathing session or unwind with the game.',
+    ),
+    (
+      'Energetic',
+      AuraCharacter.square,
+      AuraMood.energetic,
+      'A little energy to brighten your day—enjoy it at your own pace.',
+    ),
   ];
   @override
   Widget build(BuildContext context) => PageFrame(
@@ -682,31 +712,35 @@ class _MoodCheckInPageState extends State<MoodCheckInPage> {
           children: List.generate(
             moods.length,
             (i) => SizedBox(
-              width: (constraints.maxWidth - 16) / 2,
+              width: (constraints.maxWidth - 32) / 3,
               child: Semantics(
                 selected: selected == i,
                 child: Material(
-                  color: selected == i ? Palette.input : Palette.white,
+                  color: selected == i ? Palette.blush : Palette.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(22),
                     side: BorderSide(
                       color: selected == i
-                          ? Palette.purple
+                          ? Palette.action
                           : Colors.transparent,
                       width: 2,
                     ),
                   ),
                   child: InkWell(
+                    key: ValueKey('mood-$i'),
                     borderRadius: BorderRadius.circular(22),
                     onTap: () => setState(() => selected = i),
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(8),
                       child: Column(
                         children: [
                           Character(
                             kind: moods[i].$2,
                             mood: moods[i].$3,
-                            size: 100,
+                            size: ((constraints.maxWidth - 32) / 3 - 16).clamp(
+                              24,
+                              100,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -724,22 +758,44 @@ class _MoodCheckInPageState extends State<MoodCheckInPage> {
           ),
         ),
       ),
-      FilledButton(
-        onPressed: selected == null
-            ? null
-            : () => pushPage(
-                context,
-                EntryEditor(
-                  type: EntryType.wellness,
-                  initialMood: moods[selected!].$1,
+      ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 100),
+        child: Semantics(
+          liveRegion: true,
+          child: selected == null
+              ? const SizedBox.shrink()
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      moods[selected!].$4,
+                      key: const ValueKey('mood-feedback'),
+                    ),
+                    if (selected == 4)
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          TextButton(
+                            onPressed: () => Scrollable.ensureVisible(
+                              breathingKey.currentContext!,
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 200),
+                            ),
+                            child: const Text('Try breathing'),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                pushPage(context, const MergeGamePage()),
+                            child: const Text('Play Merge & Unwind'),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
-              ),
-        child: const Text('Continue'),
+        ),
       ),
-      TextButton(
-        onPressed: () => openEditor(context, type: EntryType.wellness),
-        child: const Text('Skip to wellbeing form'),
-      ),
+      BreathingSection(key: breathingKey),
     ],
   );
 }

@@ -16,12 +16,13 @@ import 'package:auracare_mobile_app/features/wellbeing/merge_game.dart';
 import 'widget_test.dart' as helper;
 
 void main() {
-  test('the five requested base palette tokens are exact', () {
-    expect(Palette.plum, const Color(0xFF45364B));
-    expect(Palette.orchid, const Color(0xFFDD7ED9));
-    expect(Palette.mist, const Color(0xFFF4EFF4));
-    expect(Palette.apricot, const Color(0xFFF5B07E));
-    expect(Palette.blush, const Color(0xFFF9E3D8));
+  test('approved screenshot palette is exact', () {
+    expect(Palette.white, const Color(0xFFFFFFFF));
+    expect(Palette.input, const Color(0xFFFAF8FB));
+    expect(Palette.blush, const Color(0xFFF9DFEA));
+    expect(Palette.blue, const Color(0xFFA6BCE1));
+    expect(Palette.lavender, const Color(0xFFE7DEF1));
+    expect(Palette.ink, const Color(0xFF34283C));
   });
   for (final type in [EntryType.spotting, EntryType.discharge]) {
     testWidgets(
