@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../app/session.dart';
 import '../../core/widgets.dart';
+import '../../core/calendar.dart';
 import '../../core/characters.dart';
 import '../../app/theme.dart';
 import '../../data/records.dart';
 import '../wellbeing/merge_game.dart';
 import '../wellbeing/breathing.dart';
+import 'period_picker.dart';
 
 void openEditor(
   BuildContext context, {
@@ -15,7 +17,9 @@ void openEditor(
   DateTime? day,
 }) => pushPage(
   context,
-  EntryEditor(type: entry?.type ?? type, entry: entry, day: day),
+  type == EntryType.bleeding && entry == null
+      ? PeriodPickerPage(initialDay: day)
+      : EntryEditor(type: entry?.type ?? type, entry: entry, day: day),
 );
 
 class EntryEditor extends StatefulWidget {
@@ -25,8 +29,13 @@ class EntryEditor extends StatefulWidget {
     this.entry,
     this.day,
     this.initialMood,
+    this.showCalendar = true,
+    this.allowNotes = true,
+    this.onContinueJournal,
   });
   final String? initialMood;
+  final bool showCalendar, allowNotes;
+  final VoidCallback? onContinueJournal;
   final EntryType type;
   final HealthEntry? entry;
   final DateTime? day;
@@ -160,7 +169,9 @@ class _EntryEditorState extends State<EntryEditor> {
               : selection!,
           when: when!,
           zone: zone!,
-          note: note.text.trim(),
+          note: widget.type == EntryType.bleeding && !widget.allowNotes
+              ? (widget.entry?.note ?? '')
+              : note.text.trim(),
           severity: severity,
           version: (widget.entry?.version ?? 0) + 1,
           periodStart: widget.type == EntryType.bleeding ? periodStart : null,
@@ -266,7 +277,11 @@ class _EntryEditorState extends State<EntryEditor> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            widget.entry == null ? 'New ${widget.type.name}' : 'Entry details',
+            widget.entry == null
+                ? widget.type == EntryType.bleeding
+                      ? 'Period tracking'
+                      : 'New ${widget.type.name}'
+                : 'Entry details',
           ),
           bottom: PreferredSize(
             preferredSize: Size.fromHeight(demoBadgeHeight(context)),
@@ -282,16 +297,18 @@ class _EntryEditorState extends State<EntryEditor> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: spaced([
-                  Heading(
-                    widget.type == EntryType.journal
-                        ? 'Room for your words.'
-                        : 'What did you notice?',
-                  ),
-                  Text(
-                    widget.type == EntryType.journal
-                        ? 'Journal text stays in this demo session. No AI, clinician or community receives it.'
-                        : 'Use fictional observations. This session has no account storage.',
-                  ),
+                  if (widget.type != EntryType.bleeding)
+                    Heading(
+                      widget.type == EntryType.journal
+                          ? 'Room for your words.'
+                          : 'What did you notice?',
+                    ),
+                  if (widget.type != EntryType.bleeding)
+                    Text(
+                      widget.type == EntryType.journal
+                          ? 'Journal text stays in this demo session. No AI, clinician or community receives it.'
+                          : 'Use fictional observations. This session has no account storage.',
+                    ),
                   if (widget.type == EntryType.journal)
                     TextFormField(
                       controller: title,
@@ -301,7 +318,7 @@ class _EntryEditorState extends State<EntryEditor> {
                       maxLength: 80,
                       onChanged: (_) => changed(),
                     )
-                  else if (!isTracking)
+                  else if (!isTracking && widget.type != EntryType.bleeding)
                     DropdownButtonFormField<String>(
                       itemHeight: null,
                       initialValue: selection,
@@ -396,33 +413,164 @@ class _EntryEditorState extends State<EntryEditor> {
                     ],
                   ],
                   if (widget.type == EntryType.bleeding) ...[
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('First day of a new period'),
-                      subtitle: const Text(
-                        'Mark only an actual start, not every bleeding day.',
-                      ),
-                      value: periodStart == true,
-                      onChanged: busy
-                          ? null
-                          : (value) => setState(() {
-                              periodStart = value;
-                              dirty = true;
-                            }),
+                    Text(
+                      'Selected date: ${dayLabel(when!)}',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Last bleeding day of this period'),
-                      subtitle: const Text(
-                        'Optional. Confirm when the period has finished.',
+                    if (widget.showCalendar)
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final scale =
+                              MediaQuery.textScalerOf(context).scale(14) / 14;
+                          final minWidth = 336 * scale;
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SizedBox(
+                              width: constraints.maxWidth < minWidth
+                                  ? minWidth
+                                  : constraints.maxWidth,
+                              child: CalendarDatePicker(
+                                initialDate: when!,
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime(2100),
+                                onDateChanged: busy
+                                    ? (_) {}
+                                    : (day) => setState(() {
+                                        when = DateTime(
+                                          day.year,
+                                          day.month,
+                                          day.day,
+                                          when!.hour,
+                                          when!.minute,
+                                        );
+                                        dirty = true;
+                                      }),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      value: periodEnd == true,
-                      onChanged: busy
-                          ? null
-                          : (value) => setState(() {
-                              periodEnd = value;
-                              dirty = true;
-                            }),
+                    FormField<String>(
+                      validator: (_) => selection == null
+                          ? 'Choose the observed flow.'
+                          : null,
+                      builder: (field) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Flow'),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final flow in [
+                                'Spotting',
+                                'Light',
+                                'Moderate',
+                                'Heavy',
+                              ])
+                                ChoiceChip(
+                                  avatar: Icon(
+                                    Icons.water_drop,
+                                    size: 16,
+                                    color: flowColor(switch (flow) {
+                                      'Spotting' => FlowIntensity.spotting,
+                                      'Light' => FlowIntensity.light,
+                                      'Moderate' => FlowIntensity.moderate,
+                                      _ => FlowIntensity.heavy,
+                                    }),
+                                  ),
+                                  label: Text(
+                                    flow == 'Moderate' ? 'Medium' : flow,
+                                  ),
+                                  selected: selection == 'Bleeding · $flow',
+                                  onSelected: busy
+                                      ? null
+                                      : (_) => setState(() {
+                                          selection = 'Bleeding · $flow';
+                                          dirty = true;
+                                          field.didChange(selection);
+                                        }),
+                                ),
+                            ],
+                          ),
+                          if (widget.entry != null &&
+                              widget.entry!.flowIntensity ==
+                                  FlowIntensity.unspecified &&
+                              selection == widget.entry!.title)
+                            const Text(
+                              'Historical flow: unspecified. Choose a flow only if known.',
+                            ),
+                          if (field.hasError)
+                            Text(
+                              field.errorText!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    FormField<bool>(
+                      builder: (field) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Period boundary (optional)'),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              ChoiceChip(
+                                label: const Text('Neither'),
+                                selected:
+                                    periodStart != true && periodEnd != true,
+                                onSelected: busy
+                                    ? null
+                                    : (_) => setState(() {
+                                        periodStart = false;
+                                        periodEnd = false;
+                                        dirty = true;
+                                        field.didChange(false);
+                                      }),
+                              ),
+                              ChoiceChip(
+                                label: const Text('Period start'),
+                                selected: periodStart == true,
+                                onSelected: busy
+                                    ? null
+                                    : (_) => setState(() {
+                                        periodStart = true;
+                                        periodEnd = false;
+                                        dirty = true;
+                                        field.didChange(true);
+                                      }),
+                              ),
+                              ChoiceChip(
+                                label: const Text('Period end'),
+                                selected: periodEnd == true,
+                                onSelected: busy
+                                    ? null
+                                    : (_) => setState(() {
+                                        periodStart = false;
+                                        periodEnd = true;
+                                        dirty = true;
+                                        field.didChange(false);
+                                      }),
+                              ),
+                            ],
+                          ),
+                          if (widget.entry != null &&
+                              periodStart == null &&
+                              periodEnd == null)
+                            const Text('Historical entry: start/end unknown.'),
+                          if (field.hasError)
+                            Text(
+                              field.errorText!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                   if (widget.type == EntryType.wellness && selection == 'Mood')
@@ -446,32 +594,33 @@ class _EntryEditorState extends State<EntryEditor> {
                               dirty = true;
                             }),
                     ),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_month_outlined),
-                    label: Text('Date: ${dayLabel(when!)}'),
-                    onPressed: busy
-                        ? null
-                        : () async {
-                            final d = await showDatePicker(
-                              context: context,
-                              initialDate: when!,
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime(2100),
-                            );
-                            if (d != null && mounted) {
-                              setState(() {
-                                when = DateTime(
-                                  d.year,
-                                  d.month,
-                                  d.day,
-                                  when!.hour,
-                                  when!.minute,
-                                );
-                                dirty = true;
-                              });
-                            }
-                          },
-                  ),
+                  if (widget.type != EntryType.bleeding)
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      label: Text('Date: ${dayLabel(when!)}'),
+                      onPressed: busy
+                          ? null
+                          : () async {
+                              final d = await showDatePicker(
+                                context: context,
+                                initialDate: when!,
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime(2100),
+                              );
+                              if (d != null && mounted) {
+                                setState(() {
+                                  when = DateTime(
+                                    d.year,
+                                    d.month,
+                                    d.day,
+                                    when!.hour,
+                                    when!.minute,
+                                  );
+                                  dirty = true;
+                                });
+                              }
+                            },
+                    ),
                   if (widget.type != EntryType.bleeding)
                     OutlinedButton.icon(
                       icon: const Icon(Icons.schedule),
@@ -525,24 +674,50 @@ class _EntryEditorState extends State<EntryEditor> {
                       'Prototype-only scale: Unspecified, Mild, Moderate, Severe. Not clinically approved.',
                     ),
                   ],
-                  TextFormField(
-                    controller: note,
-                    key: const ValueKey('entry-note'),
-                    decoration: InputDecoration(
-                      labelText: widget.type == EntryType.journal
-                          ? 'Journal text'
-                          : 'Notes (optional)',
+                  if (widget.onContinueJournal != null)
+                    TextButton(
+                      onPressed: busy
+                          ? null
+                          : () async {
+                              if (dirty &&
+                                  !await confirm(
+                                    context,
+                                    'Continue in Journal?',
+                                    'Unsaved flow or note changes will be discarded.',
+                                    action: 'Continue',
+                                  )) {
+                                return;
+                              }
+                              if (!mounted) return;
+                              setState(() {
+                                dirty = false;
+                                allowPop = true;
+                              });
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) widget.onContinueJournal!();
+                              });
+                            },
+                      child: const Text('Continue in Journal'),
                     ),
-                    minLines: 4,
-                    maxLines: 8,
-                    maxLength: 2000,
-                    onChanged: (_) => changed(),
-                    validator: (v) =>
-                        widget.type == EntryType.journal &&
-                            (v == null || v.trim().isEmpty)
-                        ? 'Write some fictional text before saving.'
-                        : null,
-                  ),
+                  if (widget.type != EntryType.bleeding || widget.allowNotes)
+                    TextFormField(
+                      controller: note,
+                      key: const ValueKey('entry-note'),
+                      decoration: InputDecoration(
+                        labelText: widget.type == EntryType.journal
+                            ? 'Journal text'
+                            : 'Notes (optional)',
+                      ),
+                      minLines: 4,
+                      maxLines: 8,
+                      maxLength: 2000,
+                      onChanged: (_) => changed(),
+                      validator: (v) =>
+                          widget.type == EntryType.journal &&
+                              (v == null || v.trim().isEmpty)
+                          ? 'Write some fictional text before saving.'
+                          : null,
+                    ),
                   if (widget.entry != null)
                     Text(
                       'Source ID: ${widget.entry!.id} · version ${widget.entry!.version}',

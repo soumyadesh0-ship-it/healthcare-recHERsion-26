@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -7,6 +5,7 @@ import '../../app/navigation.dart';
 import '../../app/theme.dart';
 import '../../core/widgets.dart';
 import 'merge_world.dart';
+import 'ball_face.dart';
 
 class MergeGamePage extends StatefulWidget {
   const MergeGamePage({super.key});
@@ -156,14 +155,14 @@ class _MergeGamePageState extends State<MergeGamePage>
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               Text(
-                'Next ball: ${world.nextValue}',
+                'Next ball: ${ballName(world.nextValue)}',
                 key: const ValueKey('merge-next'),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ],
           ),
           const Text(
-            'Drop equal numbers together to merge. The new value adds to your score. Maximum 10: 6 + 6 stays separate.',
+            'Match the same color to merge. Green becomes turquoise, then pink, then purple. Each merge adds to your score. Larger pairs that reach the size limit stay separate.',
           ),
           Semantics(
             label:
@@ -215,7 +214,11 @@ class _MergeGamePageState extends State<MergeGamePage>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: CustomPaint(
-                      painter: _WorldPainter(world, aim),
+                      painter: _WorldPainter(
+                        world,
+                        aim,
+                        MediaQuery.disableAnimationsOf(context),
+                      ),
                       child: const SizedBox.expand(),
                     ),
                   ),
@@ -300,16 +303,10 @@ class _MergeGamePageState extends State<MergeGamePage>
 }
 
 class _WorldPainter extends CustomPainter {
-  const _WorldPainter(this.world, this.aim);
+  const _WorldPainter(this.world, this.aim, this.reducedMotion);
+  final bool reducedMotion;
   final MergeWorld world;
   final double aim;
-  static const colors = [
-    Palette.apricot,
-    Palette.apricot,
-    Palette.blush,
-    Palette.mist,
-    Palette.blush,
-  ];
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
@@ -346,35 +343,21 @@ class _WorldPainter extends CustomPainter {
         line,
       );
     }
-    void ball(int value, double x, double y, {bool preview = false}) {
+    void ball(
+      int value,
+      double x,
+      double y, {
+      bool preview = false,
+      double age = 1,
+    }) {
       final radius = MergeWorld.radiusFor(value);
-      canvas.drawCircle(
-        Offset(x, y),
-        radius,
-        Paint()..color = colors[(value - 1) % colors.length],
-      );
-      canvas.drawCircle(
-        Offset(x, y),
-        radius,
-        Paint()
-          ..color = Palette.plum
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = preview ? .5 : .25,
-      );
-      final text = TextPainter(
-        text: TextSpan(
-          text: '$value',
-          style: TextStyle(
-            fontFamily: 'Roboto',
-            fontSize: math.max(4.6, radius * .85),
-            color: Palette.plum,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      text.paint(canvas, Offset(x - text.width / 2, y - text.height / 2));
-      text.dispose();
+      canvas.save();
+      canvas.translate(x, y);
+      if (!reducedMotion && !preview && age < .22) {
+        canvas.scale(1 + .10 * (1 - age / .22));
+      }
+      paintBallFace(canvas, value, radius);
+      canvas.restore();
     }
 
     if (!world.gameOver) {
@@ -387,7 +370,7 @@ class _WorldPainter extends CustomPainter {
       );
     }
     for (final b in world.balls) {
-      ball(b.value, b.x, b.y);
+      ball(b.value, b.x, b.y, age: b.age);
     }
     canvas.restore();
   }

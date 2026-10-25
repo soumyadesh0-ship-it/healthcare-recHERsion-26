@@ -43,7 +43,7 @@ class TrackingDetails {
 
 enum Severity { unspecified, mild, moderate, severe }
 
-enum FlowIntensity { unspecified, light, moderate, heavy }
+enum FlowIntensity { unspecified, spotting, light, moderate, heavy }
 
 enum RecordedMood {
   happy,
@@ -98,6 +98,7 @@ class HealthEntry {
     if (type != EntryType.bleeding) return null;
     // The original form already saves intensity in these exact titles.
     return switch (title) {
+      'Bleeding · Spotting' => FlowIntensity.spotting,
       'Bleeding · Light' => FlowIntensity.light,
       'Bleeding · Moderate' => FlowIntensity.moderate,
       'Bleeding · Heavy' => FlowIntensity.heavy,
@@ -213,6 +214,16 @@ class DemoRecordsRepository extends RecordsRepository {
       }
       _entries[index] = entry.savedOn(DateTime.now().toUtc());
     } else {
+      if (entry.type == EntryType.bleeding &&
+          _entries.any(
+            (e) =>
+                e.type == EntryType.bleeding &&
+                dayLabel(e.when) == dayLabel(entry.when),
+          )) {
+        throw StateError(
+          'A flow entry already exists for this date. Reopen it to edit.',
+        );
+      }
       _entries.add(entry.savedOn(DateTime.now().toUtc()));
     }
     notifyListeners();

@@ -213,7 +213,7 @@ void main() {
       expect(find.text('Cycle Summary'), findsOneWidget);
       await tester.tap(find.text('Log period'));
       await tester.pumpAndSettle();
-      expect(find.text('New bleeding'), findsOneWidget);
+      expect(find.text('Period Picker'), findsOneWidget);
     },
   );
 
