@@ -4,6 +4,7 @@ import '../../app/session.dart';
 import '../../app/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/records.dart';
+
 import '../logging/editor.dart';
 import '../cycle/cycle.dart';
 import '../journal/journal.dart';
@@ -28,37 +29,32 @@ class HomePage extends StatelessWidget {
         ),
         const Heading('A little space\nfor you.'),
         Panel(
-          color: Palette.apricot,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          color: Palette.blush,
+          child: Row(
             children: [
-              const Align(
-                alignment: Alignment.centerRight,
-                child: Blossom(size: 104),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hello, Alex.',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('Take a moment. Go at your own pace.'),
+                  ],
+                ),
               ),
-              Text(
-                'Hello, Alex.',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                entries.isEmpty
-                    ? 'Your fictional demo is ready for a first entry.'
-                    : '${entries.length} records in this session, across ${entries.map((e) => dayLabel(e.when)).toSet().length} recorded days.',
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'There is no right amount to record. Take it at your pace.',
-              ),
-              TextButton(
-                onPressed: () => pushPage(context, const TimelineScreen()),
-                child: const Text('View source records'),
-              ),
+              const Blossom(size: 88),
             ],
           ),
         ),
+        Text(
+          '${entries.length} records in this session',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
         FilledButton.icon(
-          onPressed: () => openEditor(context),
+          onPressed: () => pushPage(context, const LogEntryPage()),
           icon: const Icon(Icons.add),
           label: const Text('Log entry'),
         ),
@@ -66,40 +62,51 @@ class HomePage extends StatelessWidget {
         if (session.cycleEnabled)
           ActionCard(
             title: 'Cycle records',
+            color: Palette.blush,
             subtitle: 'Record bleeding days, without predictions',
             icon: Icons.calendar_month_outlined,
             onTap: () => pushPage(context, const CyclePage()),
           )
         else
           ActionCard(
-            title: 'Cycle tracking (optional)',
+            title: 'Cycle records',
+            color: Palette.blush,
             subtitle: 'Choose whether to add it to Home',
             icon: Icons.calendar_month_outlined,
             onTap: () => pushPage(context, const CyclePage()),
           ),
         ActionCard(
           title: 'Journal',
+          color: Palette.periwinkle,
           subtitle: 'A separate place for your words',
           icon: Icons.edit_note,
           onTap: () => pushPage(context, const JournalPage()),
         ),
         ActionCard(
           title: 'Wellbeing check-in',
+          color: Palette.lavender,
           subtitle: 'Optional mood, energy, stress or sleep note',
           icon: Icons.spa_outlined,
-          onTap: () => openEditor(context, type: EntryType.wellness),
+          onTap: () => pushPage(context, const MoodCheckInPage()),
         ),
         ActionCard(
           title: 'PCOS quiz',
+          color: Palette.yellow,
           subtitle: 'Experimental questionnaire demo',
           icon: Icons.assignment_outlined,
           onTap: () => pushPage(context, const QuizPage()),
         ),
         ActionCard(
           title: 'Appointment preparation',
+          color: Palette.turquoise,
           subtitle: 'Choose notes and questions to take with you',
           icon: Icons.description_outlined,
           onTap: () => pushPage(context, const AppointmentPage()),
+        ),
+
+        TextButton(
+          onPressed: () => pushPage(context, const TimelineScreen()),
+          child: const Text('View source records'),
         ),
         Text('Recent records', style: Theme.of(context).textTheme.titleLarge),
         if (entries.isEmpty)

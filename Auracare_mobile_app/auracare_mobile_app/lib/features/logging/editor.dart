@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/session.dart';
 import '../../core/widgets.dart';
+import '../../core/characters.dart';
+import '../../app/theme.dart';
 import '../../data/records.dart';
 
 void openEditor(
@@ -15,7 +17,14 @@ void openEditor(
 );
 
 class EntryEditor extends StatefulWidget {
-  const EntryEditor({super.key, required this.type, this.entry, this.day});
+  const EntryEditor({
+    super.key,
+    required this.type,
+    this.entry,
+    this.day,
+    this.initialMood,
+  });
+  final String? initialMood;
   final EntryType type;
   final HealthEntry? entry;
   final DateTime? day;
@@ -26,7 +35,11 @@ class EntryEditor extends StatefulWidget {
 class _EntryEditorState extends State<EntryEditor> {
   final form = GlobalKey<FormState>();
   late final title = TextEditingController(text: widget.entry?.title ?? '');
-  late final note = TextEditingController(text: widget.entry?.note ?? '');
+  late final note = TextEditingController(
+    text:
+        widget.entry?.note ??
+        (widget.initialMood == null ? '' : 'Feeling: ${widget.initialMood}. '),
+  );
   late Severity severity = widget.entry?.severity ?? Severity.unspecified;
   DateTime? when;
   String? zone, selection, id;
@@ -58,7 +71,8 @@ class _EntryEditorState extends State<EntryEditor> {
         widget.entry?.when ??
         widget.day ??
         (zone == 'UTC' ? DateTime.now().toUtc() : DateTime.now());
-    selection ??= widget.entry?.title;
+    selection ??=
+        widget.entry?.title ?? (widget.initialMood == null ? null : 'Mood');
   }
 
   @override
@@ -389,4 +403,145 @@ class _EntryEditorState extends State<EntryEditor> {
       ),
     );
   }
+}
+
+class LogEntryPage extends StatelessWidget {
+  const LogEntryPage({super.key});
+  @override
+  Widget build(BuildContext context) => PageFrame(
+    title: 'Log entry',
+    children: [
+      const Heading('What would you like to track?'),
+      const SizedBox(height: 8),
+      for (final item in const [
+        ('Period', EntryType.bleeding, Icons.water_drop_outlined, Palette.pink),
+        (
+          'Symptoms',
+          EntryType.symptom,
+          Icons.waves_outlined,
+          Palette.turquoise,
+        ),
+        (
+          'Mood',
+          EntryType.wellness,
+          Icons.sentiment_satisfied_alt,
+          Palette.yellow,
+        ),
+        ('Notes', EntryType.journal, Icons.edit_note, Palette.blue),
+      ])
+        Material(
+          color: Palette.input,
+          borderRadius: BorderRadius.circular(20),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 16,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            leading: Icon(item.$3, color: item.$4, size: 30),
+            title: Text(
+              item.$1,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            trailing: const Icon(Icons.arrow_forward, size: 20),
+            onTap: () => item.$2 == EntryType.wellness
+                ? pushPage(context, const MoodCheckInPage())
+                : openEditor(context, type: item.$2),
+          ),
+        ),
+    ],
+  );
+}
+
+class MoodCheckInPage extends StatefulWidget {
+  const MoodCheckInPage({super.key});
+  @override
+  State<MoodCheckInPage> createState() => _MoodCheckInPageState();
+}
+
+class _MoodCheckInPageState extends State<MoodCheckInPage> {
+  int? selected;
+  static const moods = [
+    ('Happy', AuraCharacter.flower, AuraMood.happy),
+    ('Calm', AuraCharacter.diamond, AuraMood.calm),
+    ('Sad', AuraCharacter.cloud, AuraMood.sad),
+    ('Anxious', AuraCharacter.circle, AuraMood.anxious),
+    ('Tired', AuraCharacter.blob, AuraMood.tired),
+    ('Energetic', AuraCharacter.square, AuraMood.energetic),
+  ];
+  @override
+  Widget build(BuildContext context) => PageFrame(
+    title: 'Wellbeing check-in',
+    children: [
+      const Heading('How are you feeling today?'),
+      const Text('A small check-in, just for you.'),
+      LayoutBuilder(
+        builder: (context, constraints) => Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: List.generate(
+            moods.length,
+            (i) => SizedBox(
+              width: (constraints.maxWidth - 16) / 2,
+              child: Semantics(
+                selected: selected == i,
+                child: Material(
+                  color: selected == i ? Palette.input : Palette.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    side: BorderSide(
+                      color: selected == i
+                          ? Palette.purple
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: () => setState(() => selected = i),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        children: [
+                          Character(
+                            kind: moods[i].$2,
+                            mood: moods[i].$3,
+                            size: 100,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            moods[i].$1,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      FilledButton(
+        onPressed: selected == null
+            ? null
+            : () => pushPage(
+                context,
+                EntryEditor(
+                  type: EntryType.wellness,
+                  initialMood: moods[selected!].$1,
+                ),
+              ),
+        child: const Text('Continue'),
+      ),
+      TextButton(
+        onPressed: () => openEditor(context, type: EntryType.wellness),
+        child: const Text('Skip to wellbeing form'),
+      ),
+    ],
+  );
 }

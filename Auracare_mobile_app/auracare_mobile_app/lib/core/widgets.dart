@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+import 'characters.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -132,7 +132,7 @@ List<Widget> spaced(List<Widget> items, {double gap = 16}) => [
 ];
 
 class Panel extends StatelessWidget {
-  const Panel({super.key, required this.child, this.color = Palette.blush});
+  const Panel({super.key, required this.child, this.color = Palette.input});
   final Widget child;
   final Color color;
   @override
@@ -160,6 +160,7 @@ class EmptyNotice extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: spaced([
+        const Character(kind: AuraCharacter.blob, size: 72),
         Text(title, style: Theme.of(context).textTheme.titleLarge),
         Text(message),
       ]),
@@ -198,14 +199,16 @@ class ActionCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.onTap,
+    this.color = Palette.input,
   });
   final String title, subtitle;
   final IconData icon;
+  final Color color;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => Material(
-    color: Palette.blush,
-    borderRadius: BorderRadius.circular(24),
+    color: color,
+    borderRadius: BorderRadius.circular(20),
     child: InkWell(
       borderRadius: BorderRadius.circular(24),
       onTap: onTap,
@@ -259,70 +262,10 @@ class Blossom extends StatelessWidget {
   final double size;
   final int variant;
   @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-    child: SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(painter: _BlossomPainter(variant)),
-    ),
+  Widget build(BuildContext context) => Character(
+    size: size,
+    kind: variant == 1 ? AuraCharacter.square : AuraCharacter.flower,
   );
-}
-
-class _BlossomPainter extends CustomPainter {
-  _BlossomPainter(this.variant);
-  final int variant;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final r = size.width * .22;
-    final petal = Paint()
-      ..color = variant == 1 ? Palette.apricot : Palette.orchid;
-    for (var i = 0; i < 6; i++) {
-      final a = i * math.pi / 3;
-      canvas.drawCircle(
-        center + Offset(math.cos(a) * r, math.sin(a) * r),
-        r,
-        petal,
-      );
-    }
-    canvas.drawCircle(center, r * 1.05, Paint()..color = Palette.blush);
-    final ink = Paint()..color = Palette.plum;
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: center + Offset(-r * .32, -r * .1),
-        width: r * .13,
-        height: r * .24,
-      ),
-      ink,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: center + Offset(r * .32, -r * .1),
-        width: r * .13,
-        height: r * .24,
-      ),
-      ink,
-    );
-    canvas.drawArc(
-      Rect.fromCenter(
-        center: center + Offset(0, r * .15),
-        width: r * .42,
-        height: r * .32,
-      ),
-      0,
-      math.pi,
-      false,
-      Paint()
-        ..color = Palette.plum
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_BlossomPainter oldDelegate) =>
-      variant != oldDelegate.variant;
 }
 
 class UnavailablePage extends StatelessWidget {

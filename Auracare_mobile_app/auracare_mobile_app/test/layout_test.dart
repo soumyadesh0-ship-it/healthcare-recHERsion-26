@@ -10,6 +10,7 @@ import 'package:auracare_mobile_app/app/session.dart';
 import 'package:auracare_mobile_app/app/theme.dart';
 import 'package:auracare_mobile_app/data/records.dart';
 import 'package:auracare_mobile_app/features/cycle/cycle.dart';
+import 'package:auracare_mobile_app/features/onboarding/onboarding.dart';
 import 'package:auracare_mobile_app/features/logging/editor.dart';
 import 'package:auracare_mobile_app/features/pcos_quiz/quiz.dart';
 
@@ -120,6 +121,10 @@ void main() {
             }
           }
 
+          await frame(WelcomeSplash(onContinue: () {}), 'splash');
+          await frame(Onboarding(onEnter: (_) {}), 'onboarding');
+          await frame(const LogEntryPage(), 'log_entry');
+          await frame(const MoodCheckInPage(), 'mood');
           await frame(const CyclePage(), 'cycle');
           await frame(
             const EntryEditor(type: EntryType.journal),

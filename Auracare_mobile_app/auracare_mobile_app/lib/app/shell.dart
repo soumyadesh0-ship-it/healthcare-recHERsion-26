@@ -19,7 +19,7 @@ class _AppShellState extends State<AppShell> {
   static const labels = ['Home', 'Timeline', 'Learn', 'Insights', 'Profile'];
   static const icons = [
     Icons.home_outlined,
-    Icons.view_agenda_outlined,
+    Icons.calendar_month_outlined,
     Icons.menu_book_outlined,
     Icons.insights_outlined,
     Icons.person_outline,
@@ -35,6 +35,14 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(index == 0 ? 'auracare' : labels[index]),
+      actions: [
+        if (index == 0)
+          IconButton(
+            tooltip: 'Open profile',
+            onPressed: () => setState(() => index = 4),
+            icon: const Icon(Icons.person_outline),
+          ),
+      ],
       bottom: PreferredSize(
         preferredSize: Size.fromHeight(demoBadgeHeight(context)),
         child: DemoBadge(),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/session.dart';
 import '../../app/theme.dart';
 import '../../core/widgets.dart';
+import '../../core/characters.dart';
 
 class Onboarding extends StatefulWidget {
   const Onboarding({super.key, required this.onEnter});
@@ -15,14 +16,14 @@ class _OnboardingState extends State<Onboarding> {
   final controller = PageController();
   int index = 0;
   static const titles = [
-    'Record what\nyou notice.',
-    'Your history,\nin context.',
-    'A little more\nprepared.',
+    'Your body. Your rhythm. Your space.',
+    'Small steps for a healthier you.',
+    'Knowledge for every stage.',
   ];
   static const descriptions = [
-    'A gentle space for symptoms, small observations and your own words. You choose what to record.',
-    'Look back at the entries you made. Days without entries stay unknown, without assumptions.',
-    'Bring selected notes and questions to a healthcare conversation. Your words stay yours.',
+    'A little room to notice, reflect and care for yourself.',
+    'Track what matters to you, one observation at a time.',
+    'Explore topics and prepare your own questions.',
   ];
   void go(int page) {
     if (MediaQuery.disableAnimationsOf(context)) {
@@ -53,9 +54,14 @@ class _OnboardingState extends State<Onboarding> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
                 children: [
-                  Text(
-                    'auracare',
-                    style: Theme.of(context).textTheme.titleLarge,
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'auracare',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
                   ),
                   const Spacer(),
                   TextButton(onPressed: () => go(2), child: const Text('Skip')),
@@ -71,7 +77,26 @@ class _OnboardingState extends State<Onboarding> {
                   (i) => ListView(
                     padding: const EdgeInsets.all(20),
                     children: spaced([
-                      Center(child: Blossom(size: 190, variant: i % 2)),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(30),
+                          decoration: BoxDecoration(
+                            color: i == 1 ? Palette.lavender : Palette.blush,
+                            borderRadius: BorderRadius.circular(
+                              i == 1 ? 80 : 110,
+                            ),
+                          ),
+                          child: Character(
+                            size: 160,
+                            kind: [
+                              AuraCharacter.flower,
+                              AuraCharacter.square,
+                              AuraCharacter.diamond,
+                            ][i],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       Heading(titles[i]),
                       Text(descriptions[i]),
                       if (i == 2) ...[
@@ -143,7 +168,7 @@ class _OnboardingState extends State<Onboarding> {
                           width: index == i ? 24 : 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: index == i ? Palette.plum : Palette.orchid,
+                            color: index == i ? Palette.purple : Palette.input,
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
@@ -162,7 +187,14 @@ class _OnboardingState extends State<Onboarding> {
                       if (index < 2)
                         FilledButton(
                           onPressed: () => go(index + 1),
-                          child: const Text('Next'),
+                          style: FilledButton.styleFrom(
+                            shape: const CircleBorder(),
+                            padding: const EdgeInsets.all(16),
+                          ),
+                          child: Semantics(
+                            label: 'Next',
+                            child: const Icon(Icons.arrow_forward),
+                          ),
                         ),
                     ],
                   ),
@@ -174,4 +206,55 @@ class _OnboardingState extends State<Onboarding> {
       ),
     );
   }
+}
+
+class WelcomeSplash extends StatelessWidget {
+  const WelcomeSplash({super.key, required this.onContinue});
+  final VoidCallback onContinue;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 48),
+                      Text(
+                        'auracare',
+                        style: Theme.of(context).textTheme.headlineLarge!
+                            .copyWith(fontSize: 48, letterSpacing: -2),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('A kinder way to understand your body.'),
+                    ],
+                  ),
+                  const SizedBox(height: 100),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Center(child: CharacterCluster()),
+                      const SizedBox(height: 28),
+                      FilledButton(
+                        onPressed: onContinue,
+                        child: const Text('Get started'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }

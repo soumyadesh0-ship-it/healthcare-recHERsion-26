@@ -10,6 +10,7 @@ import 'package:auracare_mobile_app/features/cycle/cycle.dart';
 import 'package:auracare_mobile_app/features/logging/editor.dart';
 import 'package:auracare_mobile_app/features/pcos_quiz/quiz.dart';
 import 'package:auracare_mobile_app/app/theme.dart';
+import 'package:auracare_mobile_app/app/setup_preference.dart';
 
 Future<void> show(WidgetTester tester, Widget page, DemoSession session) async {
   await tester.pumpWidget(
@@ -61,13 +62,23 @@ Future<void> tapText(WidgetTester tester, String text) async {
 }
 
 void main() {
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SetupPreference.channel, (_) async => false);
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SetupPreference.channel, null);
+  });
   testWidgets(
     'onboarding skip/demo entry and five tabs preserve search state',
     (tester) async {
       await tester.pumpWidget(const AuracareApp());
       await tester.pumpAndSettle();
-      expect(find.text('Record what\nyou notice.'), findsOneWidget);
-      await tapText(tester, 'Next');
+      await tapText(tester, 'Get started');
+      expect(find.text('Your body. Your rhythm. Your space.'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Next'));
+      await tester.pumpAndSettle();
       await tapText(tester, 'Back');
       await tapText(tester, 'Skip');
       await tapText(tester, 'Start empty demo');

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/session.dart';
 import '../../core/widgets.dart';
+import '../../core/calendar.dart';
 import '../../data/records.dart';
 import '../logging/editor.dart';
 
@@ -60,11 +61,18 @@ class _TimelinePageState extends State<TimelinePage> {
         Heading(
           widget.onlyType == EntryType.journal
               ? 'Your journal.'
-              : 'Your history, together.',
+              : 'Cycle timeline',
         ),
         const Text(
           'Recorded days tell part of the story. Unrecorded days are unknown.',
         ),
+        if (widget.onlyType == null)
+          RecordCalendar(
+            entries: all,
+            selected: range?.start,
+            onSelect: (day) =>
+                setState(() => range = DateTimeRange(start: day, end: day)),
+          ),
         FilledButton.icon(
           onPressed: () =>
               openEditor(context, type: widget.onlyType ?? EntryType.symptom),

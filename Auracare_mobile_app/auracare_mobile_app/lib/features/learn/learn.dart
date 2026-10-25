@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/session.dart';
 import '../../core/widgets.dart';
+import '../../app/theme.dart';
 import '../../data/services.dart';
 import '../appointments/appointments.dart';
 
@@ -26,7 +27,7 @@ class _LearnPageState extends State<LearnPage> {
       key: const PageStorageKey('learn'),
       padding: const EdgeInsets.all(20),
       children: spaced([
-        const Heading('A place to understand.'),
+        const Heading('Learn'),
         const Text(
           "Women's Health Library · structural previews. Medical articles, sources and clinical reviews have not been supplied.",
         ),
@@ -60,6 +61,7 @@ class _LearnPageState extends State<LearnPage> {
           ),
         for (final r in filtered)
           ActionCard(
+            color: Palette.tiles[resources.indexOf(r) % Palette.tiles.length],
             title: r.topic,
             subtitle: 'Preview · article not available',
             icon: Icons.menu_book_outlined,

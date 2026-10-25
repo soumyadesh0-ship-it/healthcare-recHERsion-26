@@ -1,8 +1,8 @@
 # Auracare mobile demo
 
-Flutter/Dart mobile UI with a shared in-memory synthetic session. No real account, secure persistence, health uploads, model, AI service, community or provider integration is connected. Do not enter real health information. Restarting returns to onboarding; no sensitive-text storage package is used.
+Flutter/Dart mobile UI with a shared in-memory synthetic session. No real account, secure persistence, health uploads, model, AI service, community or provider integration is connected. Do not enter real health information. Android remembers first-run onboarding completion using a native SharedPreferences flag. Health records and other session preferences remain in memory; restarting starts with empty records. Samples are loaded only through an explicit demo action. No sensitive-text storage package is used.
 
-Implemented: three onboarding pages, sample/empty entry, Home/Timeline/Learn/Insights/Profile tabs, symptom/wellbeing/journal/bleeding record CRUD, date/type filters, optional cycle day selection, source-linked descriptive coverage, selected appointment preparation and clipboard summary, question management, synthetic JSON export/reset, and experimental PCOS quiz with fixture/failure/unavailable states. Learn topics are structural previews without invented articles or review credentials.
+Implemented: original flat geometric characters, white/pastel UI, welcome screen, three onboarding pages, sample/empty entry, Home/Timeline/Learn/Insights/Profile tabs, symptom/wellbeing/journal/bleeding record CRUD, date/type filters, optional cycle day selection, source-linked descriptive coverage, selected appointment preparation and clipboard summary, question management, synthetic JSON export/reset, and experimental PCOS quiz with fixture/failure/unavailable states. Learn topics are structural previews without invented articles or review credentials.
 
 ## Run
 
@@ -23,7 +23,7 @@ flutter devices
 flutter run
 ```
 
-These are launch instructions, not a claim that a native device run succeeded. Android Doctor reported missing command-line tools and unknown license status. The debug build attempt failed when Gradle's JVM exhausted memory; test runs also initially encountered full disk space. Free adequate disk/RAM and complete the Android toolchain before building. iOS requires macOS/Xcode; no iOS build was attempted on Windows. Signing/provisioning has not been customized.
+See [redesign verification](../../docs/AURACARE_REDESIGN.md) for the current UI changes and verification. The following notes describe the original implementation audit: Android Doctor reported missing command-line tools and unknown license status. The debug build attempt failed when Gradle's JVM exhausted memory; test runs also initially encountered full disk space. Free adequate disk/RAM and complete the Android toolchain before building. iOS requires macOS/Xcode; no iOS build was attempted on Windows. Signing/provisioning has not been customized.
 
 ## Validate
 

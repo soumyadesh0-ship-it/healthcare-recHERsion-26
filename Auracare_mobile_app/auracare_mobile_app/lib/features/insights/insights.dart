@@ -13,6 +13,7 @@ class InsightsPage extends StatefulWidget {
 }
 
 class _InsightsPageState extends State<InsightsPage> {
+  bool sources = false;
   late DateTimeRange range = DateTimeRange(
     start: dayOnly(DateTime.now()).subtract(const Duration(days: 6)),
     end: dayOnly(DateTime.now()),
@@ -28,9 +29,24 @@ class _InsightsPageState extends State<InsightsPage> {
       key: const PageStorageKey('insights'),
       padding: const EdgeInsets.all(20),
       children: spaced([
-        const Heading('Patterns, with context.'),
+        const Heading('Insights'),
         const Text(
           'Descriptive counts only. Prototype logic: prototype-count-v1. Not clinically reviewed; no diagnosis or causal conclusions.',
+        ),
+        Wrap(
+          spacing: 8,
+          children: [
+            ChoiceChip(
+              label: const Text('Overview'),
+              selected: !sources,
+              onSelected: (_) => setState(() => sources = false),
+            ),
+            ChoiceChip(
+              label: const Text('Source records'),
+              selected: sources,
+              onSelected: (_) => setState(() => sources = true),
+            ),
+          ],
         ),
         OutlinedButton.icon(
           icon: const Icon(Icons.date_range),
@@ -45,28 +61,29 @@ class _InsightsPageState extends State<InsightsPage> {
             if (selected != null && mounted) setState(() => range = selected);
           },
         ),
-        Panel(
-          color: Palette.apricot,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: spaced([
-              Text(
-                '${coverage.recordedDays} of ${coverage.totalDays} days with entries',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              Text(
-                '${coverage.unknownDays} days without entries are unknown, not symptom-free.',
-              ),
-              Semantics(
-                label:
-                    '${coverage.recordedDays} recorded days out of ${coverage.totalDays}',
-                child: LinearProgressIndicator(
-                  value: coverage.recordedDays / coverage.totalDays,
+        if (!sources && coverage.records.isNotEmpty)
+          Panel(
+            color: Palette.input,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: spaced([
+                Text(
+                  '${coverage.recordedDays} of ${coverage.totalDays} days with entries',
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-              ),
-            ]),
+                Text(
+                  '${coverage.unknownDays} days without entries are unknown, not symptom-free.',
+                ),
+                Semantics(
+                  label:
+                      '${coverage.recordedDays} recorded days out of ${coverage.totalDays}',
+                  child: LinearProgressIndicator(
+                    value: coverage.recordedDays / coverage.totalDays,
+                  ),
+                ),
+              ]),
+            ),
           ),
-        ),
         if (coverage.records.isEmpty)
           const EmptyNotice(
             'Insufficient data',
@@ -77,23 +94,27 @@ class _InsightsPageState extends State<InsightsPage> {
             'No symptom entries in this range',
             'Other entry types do not establish the presence or absence of symptoms.',
           ),
-        for (final count in coverage.symptomDays.entries)
-          Panel(
-            child: Text(
-              '${count.key} recorded on ${count.value} of ${coverage.recordedDays} days with entries. Days without entries are unknown.',
-            ),
-          ),
+        if (!sources)
+          for (final count in coverage.symptomDays.entries)
+            if (!sources && coverage.records.isNotEmpty)
+              Panel(
+                child: Text(
+                  '${count.key} recorded on ${count.value} of ${coverage.recordedDays} days with entries. Days without entries are unknown.',
+                ),
+              ),
         const Text(
           'Counting groups calendar dates as recorded in their declared timezone. Mixed-zone dates are not converted or compared as instants. Counts are not PCOS scores, cycle predictions or evidence of improvement.',
         ),
-        Text('Source records', style: Theme.of(context).textTheme.titleLarge),
-        for (final e in coverage.records) ...[
-          Text('${dayLabel(e.when)} · v${e.version}'),
-          EntryCard(
-            entry: e,
-            onTap: () => openEditor(context, entry: e),
-          ),
-        ],
+        if (sources)
+          Text('Source records', style: Theme.of(context).textTheme.titleLarge),
+        if (sources)
+          for (final e in coverage.records) ...[
+            Text('${dayLabel(e.when)} · v${e.version}'),
+            EntryCard(
+              entry: e,
+              onTap: () => openEditor(context, entry: e),
+            ),
+          ],
       ]),
     );
   }
