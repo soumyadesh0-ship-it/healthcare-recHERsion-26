@@ -14,7 +14,7 @@ import '../features/appointments/doctor.dart';
 import '../features/pcos_quiz/quiz.dart';
 import '../features/logging/editor.dart';
 import '../features/sisterhood/sisterhood.dart';
-import '../features/chat/chat.dart';
+import '../features/assistant/assistant.dart';
 
 enum AppDestination {
   home('Home', Icons.home_outlined),
@@ -104,7 +104,7 @@ class _AppShellState extends State<AppShell> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: RouteSettings(name: route),
-        builder: (_) => page is UnavailablePage || page is ChatPage
+        builder: (_) => page is UnavailablePage
             ? page
             : Scaffold(
                 appBar: AppBar(title: const AuraCareBrandHeader()),
@@ -164,12 +164,7 @@ class _AppShellState extends State<AppShell> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     const AuraLogo(width: 160),
-                    drawerItem(
-                      'Profile',
-                      Icons.person_outline,
-                      profile,
-                      '/app/profile',
-                    ),
+                    
                     drawerItem(
                       'Learn',
                       Icons.menu_book_outlined,
@@ -190,7 +185,7 @@ class _AppShellState extends State<AppShell> {
                     drawerItem(
                       'AI Assistant',
                       Icons.chat_bubble_outline,
-                      const ChatPage(),
+                      const AssistantPage(),
                       '/app/assistant',
                     ),
                     drawerItem(
