@@ -1,5 +1,7 @@
 # Brand identity
 
+> Mobile override (2026-10-25): the explicit mobile brief supersedes the historical palette and typography below for the Flutter app. Use Plum `#45364B`, Orchid `#DD7ED9`, Mist `#F4EFF4`, Apricot `#F5B07E` and Blush Cloud `#F9E3D8`; system sans-serif and original Flutter-painted characters. Orchid is decorative/selected emphasis, not a normal-text background. See [Mobile UI handoff](MOBILE_UI_HANDOFF.md) and immutable [theme tokens](../Auracare_mobile_app/auracare_mobile_app/lib/app/theme.dart). No old palette is used in the product UI.
+
 ## Verified status
 
 No logo, fonts, assets, styles or components exist; no existing visual implementation is being replaced. This is the user's specified direction. [Design system](DESIGN_SYSTEM.md) defines component details.

@@ -1,5 +1,7 @@
 # Architecture
 
+> Mobile prototype update (2026-10-25): Flutter UI, Navigator, ChangeNotifier and an in-memory synthetic repository now implement the local demo. Records, resources, quiz and account/privacy have separate service boundaries. No backend/model/authentication is connected. The following server architecture remains proposed; the documentation-only statement describes the prior audit baseline. See [Mobile UI handoff](MOBILE_UI_HANDOFF.md).
+
 ## Existing architecture
 
 Documentation only: no executable frontend/backend, database, authentication, AI, reports, clinics or community integration. No technology stack is selected. Earlier Next.js/PostgreSQL suggestions were unimplemented options. See [audit](../README.md).

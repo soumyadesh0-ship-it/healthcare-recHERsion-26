@@ -1,5 +1,7 @@
 # Auracare — Women's Health Companion
 
+> Mobile prototype update (2026-10-25): a Flutter session-only synthetic demo now lives in [Auracare_mobile_app/auracare_mobile_app](Auracare_mobile_app/auracare_mobile_app/README.md). See [Mobile UI handoff](docs/MOBILE_UI_HANDOFF.md) for implemented scope, the new mobile palette, validation and integration gaps. The dated audit below describes the earlier documentation-only baseline; its all-planned status does not describe this new local UI. No production backend is connected.
+
 Auracare is a planned platform for recording personal health history, understanding information and preparing for healthcare conversations. It addresses fragmented records, confusing terminology and disconnected wellbeing, education, community and appointment experiences. Target users span women's health life stages; do not assume everyone menstruates, seeks pregnancy or shares the same anatomy or goals. Age eligibility and launch geography remain open.
 
 ## Verified repository audit
