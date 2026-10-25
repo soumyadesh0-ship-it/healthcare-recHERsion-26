@@ -58,110 +58,139 @@ class _AppShellState extends State<AppShell> {
     ProfilePage(),
   ];
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(index == 0 ? 'auracare' : labels[index]),
-      bottom: PreferredSize(
-        preferredSize: Size.fromHeight(demoBadgeHeight(context)),
-        child: DemoBadge(),
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final tablet = size.width >= 600 && size.height >= 500;
+    final navigation = tablet ? _tabletNavigation() : _phoneNavigation(context);
+    final content = Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: IndexedStack(index: index, children: pages),
+      ),
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(index == 0 ? 'auracare' : labels[index]),
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(demoBadgeHeight(context)),
+          child: DemoBadge(),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: tablet
+            ? Row(
+                children: [
+                  navigation,
+                  const VerticalDivider(width: 1),
+                  Expanded(child: content),
+                ],
+              )
+            : content,
+      ),
+      bottomNavigationBar: tablet ? null : navigation,
+    );
+  }
+
+  Widget _tabletNavigation() => NavigationRail(
+    selectedIndex: index,
+    onDestinationSelected: select,
+    labelType: NavigationRailLabelType.all,
+    indicatorColor: Palette.blush,
+    destinations: List.generate(
+      labels.length,
+      (i) => NavigationRailDestination(
+        icon: Icon(icons[i], key: ValueKey('tab-${labels[i]}')),
+        selectedIcon: Icon(icons[i], key: ValueKey('tab-${labels[i]}')),
+        label: Text(labels[i]),
       ),
     ),
-    body: SafeArea(
-      top: false,
-      bottom: false,
-      child: IndexedStack(index: index, children: pages),
-    ),
-    bottomNavigationBar: SafeArea(
-      top: false,
-      child: Material(
-        color: Palette.mist,
-        child:
-            MediaQuery.textScalerOf(context).scale(14) > 20 ||
-                MediaQuery.sizeOf(context).width < 360
-            ? LayoutBuilder(
-                builder: (context, constraints) => Wrap(
-                  children: List.generate(
-                    labels.length,
-                    (i) => SizedBox(
-                      width: constraints.maxWidth / 2,
-                      child: Semantics(
-                        selected: index == i,
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: TextButton(
-                            key: ValueKey('tab-${labels[i]}'),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(48, 56),
-                              backgroundColor: index == i
-                                  ? Palette.blush
-                                  : Palette.mist,
-                            ),
-                            onPressed: () => select(i),
-                            child: Text(labels[i], textAlign: TextAlign.center),
-                          ),
-                        ),
-                      ),
+  );
+
+  Widget _phoneNavigation(BuildContext context) => SafeArea(
+    top: false,
+    child: Material(
+      color: Palette.mist,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final textScale = MediaQuery.textScalerOf(context).scale(12);
+          final scrolls = constraints.maxWidth < 360 || textScale > 15;
+          final itemWidth = scrolls
+              ? 72.0
+              : constraints.maxWidth / labels.length;
+          final destinations = List.generate(
+            labels.length,
+            (i) => SizedBox(
+              width: itemWidth,
+              child: Semantics(
+                selected: index == i,
+                button: true,
+                label: labels[i],
+                excludeSemantics: true,
+                child: InkWell(
+                  key: ValueKey('tab-${labels[i]}'),
+                  onTap: () => select(i),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 6,
+                      horizontal: 2,
                     ),
-                  ),
-                ),
-              )
-            : Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: List.generate(
-                    labels.length,
-                    (i) => Expanded(
-                      child: Semantics(
-                        selected: index == i,
-                        button: true,
-                        label: labels[i],
-                        excludeSemantics: true,
-                        child: InkWell(
-                          key: ValueKey('tab-${labels[i]}'),
-                          onTap: () => select(i),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 8,
-                              horizontal: 2,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: index == i
-                                        ? Palette.blush
-                                        : Palette.mist,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Icon(icons[i], color: Palette.plum),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  labels[i],
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: index == i
-                                        ? FontWeight.w700
-                                        : FontWeight.w400,
-                                  ),
-                                ),
-                              ],
-                            ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: index == i ? Palette.blush : Palette.mist,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(icons[i], color: Palette.plum, size: 20),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          labels[i],
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: index == i
+                                ? FontWeight.w700
+                                : FontWeight.w400,
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
               ),
+            ),
+          );
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: scrolls
+                ? SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: destinations,
+                    ),
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: destinations
+                        .map((destination) => Expanded(child: destination))
+                        .toList(),
+                  ),
+          );
+        },
       ),
     ),
   );

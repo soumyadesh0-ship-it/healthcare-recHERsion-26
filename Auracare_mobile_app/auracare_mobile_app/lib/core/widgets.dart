@@ -116,9 +116,14 @@ class PageFrame extends StatelessWidget {
     ),
     body: SafeArea(
       top: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        children: spaced(children),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            children: spaced(children),
+          ),
+        ),
       ),
     ),
   );

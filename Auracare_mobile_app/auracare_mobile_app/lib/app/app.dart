@@ -18,6 +18,7 @@ class AuracareApp extends StatefulWidget {
 }
 
 class _AuracareAppState extends State<AuracareApp> {
+  String? lastLayoutMetrics;
   late final DemoSession session =
       widget.session ??
       DemoSession(records: DemoRecordsRepository(sample: false));
@@ -84,6 +85,25 @@ class _AuracareAppState extends State<AuracareApp> {
             : const {},
         builder: (context, child) {
           final media = MediaQuery.of(context);
+          if (kDebugMode) {
+            final physicalSize = Size(
+              media.size.width * media.devicePixelRatio,
+              media.size.height * media.devicePixelRatio,
+            );
+            final metrics =
+                'logical=${media.size.width.toStringAsFixed(1)}x'
+                '${media.size.height.toStringAsFixed(1)} dp, '
+                'physical=${physicalSize.width.toStringAsFixed(0)}x'
+                '${physicalSize.height.toStringAsFixed(0)} px, '
+                'dpr=${media.devicePixelRatio.toStringAsFixed(2)}, '
+                'textScale=${(media.textScaler.scale(14) / 14).toStringAsFixed(2)}, '
+                'padding=${media.padding}, viewPadding=${media.viewPadding}, '
+                'viewInsets=${media.viewInsets}, platform=${Theme.of(context).platform}';
+            if (metrics != lastLayoutMetrics) {
+              lastLayoutMetrics = metrics;
+              debugPrint('[AuraCare layout] $metrics');
+            }
+          }
           return MediaQuery(
             data: media.copyWith(
               disableAnimations:
