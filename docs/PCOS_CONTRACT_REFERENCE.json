@@ -1,0 +1,78 @@
+{
+  "version": "experimental-1",
+  "scope": "adults 18\u201345; research prototype",
+  "questions": [
+    {
+      "key": "age",
+      "source_wording": "Age (in Years)",
+      "type": "number",
+      "encoding": "18\u201345"
+    },
+    {
+      "key": "bmi",
+      "source_wording": "Calculated from weight in kg and height in cm",
+      "type": "number_or_null",
+      "encoding": "10\u201370; null allowed"
+    },
+    {
+      "key": "regular_periods",
+      "source_wording": "Are your periods regular ?",
+      "type": "binary",
+      "encoding": "1=yes; 0=no; null=unknown"
+    },
+    {
+      "key": "weight_gain",
+      "source_wording": "Have you gained weight recently?",
+      "type": "binary",
+      "encoding": "1=yes; 0=no; null=unknown"
+    },
+    {
+      "key": "excess_hair",
+      "source_wording": "Do you have excessive body/facial hair growth ?",
+      "type": "binary",
+      "encoding": "1=yes; 0=no; null=unknown"
+    },
+    {
+      "key": "skin_darkening",
+      "source_wording": "Are you noticing skin darkening recently?",
+      "type": "binary",
+      "encoding": "1=yes; 0=no; null=unknown"
+    },
+    {
+      "key": "hair_thinning",
+      "source_wording": "Do have hair loss/hair thinning/baldness ?",
+      "type": "binary",
+      "encoding": "1=yes; 0=no; null=unknown"
+    },
+    {
+      "key": "acne",
+      "source_wording": "Do you have pimples/acne on your face/jawline ?",
+      "type": "binary",
+      "encoding": "1=yes; 0=no; null=unknown"
+    }
+  ],
+  "missing_policy": "A null binary answer produces insufficient_inputs; null BMI uses development-trained imputation.",
+  "target": "Self-reported prior PCOS diagnosis; not verified disease",
+  "optional_routing_field": {
+    "known_pcos_diagnosis": "Boolean; true skips scoring and routes to tracking."
+  },
+  "personalization_rules": [
+    {
+      "if": "known_pcos_diagnosis is true",
+      "then": "tracking journey, no score"
+    },
+    {
+      "if": "regular_periods is 0",
+      "then": "Offer descriptive cycle-history follow-up; do not add it to model features"
+    },
+    {
+      "if": "any required binary answer is null",
+      "then": "Ask for clarification or return insufficient_inputs"
+    },
+    {
+      "if": "reusing previous answers",
+      "then": "Ask the user to confirm/update; do not interpret missing daily logs as symptom absence"
+    }
+  ],
+  "note": "This is a field/routing specification, not an implemented Flutter UI or clinically reviewed questionnaire."
+}

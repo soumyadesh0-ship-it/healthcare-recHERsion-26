@@ -308,7 +308,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('tab-Profile')));
+      await tester.tap(find.byKey(const ValueKey('open-drawer')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
       expect(find.text('Signed in as alex@example.com'), findsOneWidget);
       expect(

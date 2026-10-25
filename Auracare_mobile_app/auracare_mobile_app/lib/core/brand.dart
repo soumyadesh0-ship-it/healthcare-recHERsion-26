@@ -61,3 +61,15 @@ class AuraCareBrandHeader extends StatelessWidget {
     ),
   );
 }
+
+class AuraLogoIcon extends StatelessWidget {
+  const AuraLogoIcon({super.key});
+  @override
+  Widget build(BuildContext context) => Image.asset(
+    'assets/brand/auracare-icon.png',
+    width: 40,
+    height: 40,
+    fit: BoxFit.contain,
+    excludeFromSemantics: true,
+  );
+}

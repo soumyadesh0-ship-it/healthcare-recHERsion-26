@@ -12,6 +12,10 @@ import '../data/records.dart';
 import 'theme.dart';
 import 'shell.dart';
 import 'navigation.dart';
+import '../core/brand.dart';
+import '../features/profile/profile.dart';
+import '../features/learn/learn.dart';
+import '../features/insights/insights.dart';
 import '../features/onboarding/onboarding.dart';
 import '../features/auth/auth.dart';
 
@@ -174,6 +178,62 @@ class _AuracareAppState extends State<AuracareApp> {
           debugShowCheckedModeBanner: false,
           theme: auracareTheme(),
           navigatorObservers: [auraRouteObserver],
+          onGenerateRoute: (settings) {
+            final destination = AppDestination.fromRoute(settings.name);
+            if (destination == null &&
+                !{
+                  '/app/profile',
+                  '/app/learn',
+                  '/app/insights',
+                }.contains(settings.name)) {
+              return null;
+            }
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (routeContext) {
+                if (authenticatedUser == null && !demoMode) {
+                  return LoginPage(
+                    auth: auth,
+                    onAuthenticated: (user) {
+                      updateAuthUser(user);
+                      Navigator.of(routeContext)
+                          .popUntil((route) => route.isFirst);
+                    },
+                    onDemoSelected: (sample) {
+                      enterDemo(sample);
+                      Navigator.of(routeContext)
+                          .popUntil((route) => route.isFirst);
+                    },
+                  );
+                }
+                if (destination != null) {
+                  return AppShell(
+                    initialDestination: destination,
+                    authUser: authenticatedUser,
+                    onSignOut: signOut,
+                  );
+                }
+                final page = switch (settings.name) {
+                  '/app/profile' => ProfilePage(
+                    authUser: authenticatedUser,
+                    onSignOut: () async {
+                      await signOut();
+                      if (routeContext.mounted) {
+                        Navigator.of(routeContext)
+                            .popUntil((route) => route.isFirst);
+                      }
+                    },
+                  ),
+                  '/app/learn' => const LearnPage(),
+                  _ => const InsightsPage(),
+                };
+                return Scaffold(
+                  appBar: AppBar(title: const AuraCareBrandHeader()),
+                  body: SafeArea(child: page),
+                );
+              },
+            );
+          },
           routes: kDebugMode
               ? {
                   '/debug/onboarding': (context) =>

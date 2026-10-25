@@ -1,5 +1,11 @@
 # Auracare mobile demo
 
+The local UI integration combines `md_modification`'s navigation drawer,
+five destinations and wellbeing controls with the authenticated PCOS flashcards
+and trained-model service on `main`. Profile, Learn and Insights are available
+from the drawer; PCOS Quiz and Wellbeing are bottom destinations. See
+[integration notes](../../docs/TEAM_UI_INTEGRATION.md).
+
 PCOS flashcards and real Random Forest serving through the shared FastAPI:
 [integration, local USB setup and validation](../../docs/PCOS_MODEL_INTEGRATION.md).
 Signed-in quiz submission uses the configurable API URL and current Supabase

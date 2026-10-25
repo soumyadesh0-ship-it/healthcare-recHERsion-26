@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../app/navigation.dart';
 import '../../app/theme.dart';
 import '../../core/widgets.dart';
+import 'breath_haptics.dart';
 
 /// A monotonic, frame-independent clock. Ticker frames only refresh its display.
 class BreathingClock {
@@ -38,7 +41,9 @@ class BreathingClock {
 }
 
 class BreathingSection extends StatefulWidget {
-  const BreathingSection({super.key});
+  const BreathingSection({super.key, this.active = true, this.haptics});
+  final bool active;
+  final BreathHaptics? haptics;
   @override
   State<BreathingSection> createState() => _BreathingSectionState();
 }
@@ -50,6 +55,13 @@ class _BreathingSectionState extends State<BreathingSection>
         RouteAware,
         AutomaticKeepAliveClientMixin {
   final clock = BreathingClock();
+  late final haptics = widget.haptics ?? BreathHaptics();
+  bool vibration = false;
+  int lastPhase = 0;
+  void cue(BreathCue cue) {
+    if (vibration && widget.active) unawaited(haptics.cue(cue));
+  }
+
   late final Ticker ticker;
   ModalRoute<dynamic>? route;
   Duration get now => SchedulerBinding.instance.currentSystemFrameTimeStamp;
@@ -59,7 +71,18 @@ class _BreathingSectionState extends State<BreathingSection>
     WidgetsBinding.instance.addObserver(this);
     ticker = createTicker((_) {
       setState(() => clock.update(now));
-      if (!clock.running) ticker.stop();
+      if (clock.complete) {
+        ticker.stop();
+        cue(BreathCue.finish);
+      } else {
+        final phase =
+            clock.elapsed.inMilliseconds ~/ 10000 * 2 +
+            (clock.elapsed.inMilliseconds % 10000 >= 4000 ? 1 : 0);
+        if (phase != lastPhase) {
+          lastPhase = phase;
+          cue(phase.isEven ? BreathCue.inhale : BreathCue.exhale);
+        }
+      }
     });
   }
 
@@ -74,27 +97,43 @@ class _BreathingSectionState extends State<BreathingSection>
     }
   }
 
-  void pause() {
+  void pause({bool feedback = true}) {
+    final wasRunning = clock.running;
+    haptics.cancel();
     clock.pause(now);
     ticker.stop();
+    if (wasRunning && feedback) cue(BreathCue.pause);
     if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(covariant BreathingSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.active && oldWidget.active) pause(feedback: false);
   }
 
   void start() {
     clock.start(now);
-    if (clock.running) ticker.start();
+    if (clock.running) {
+      lastPhase =
+          clock.elapsed.inMilliseconds ~/ 10000 * 2 +
+          (clock.elapsed.inMilliseconds % 10000 >= 4000 ? 1 : 0);
+      cue(lastPhase.isEven ? BreathCue.inhale : BreathCue.exhale);
+      ticker.start();
+    }
     setState(() {});
   }
 
   @override
-  void didPushNext() => pause();
+  void didPushNext() => pause(feedback: false);
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) pause();
+    if (state != AppLifecycleState.resumed) pause(feedback: false);
   }
 
   @override
   void deactivate() {
+    haptics.cancel();
     clock.pause(now);
     ticker.stop();
     super.deactivate();
@@ -102,6 +141,7 @@ class _BreathingSectionState extends State<BreathingSection>
 
   @override
   void dispose() {
+    haptics.cancel();
     ticker.dispose();
     auraRouteObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
@@ -127,6 +167,18 @@ class _BreathingSectionState extends State<BreathingSection>
           const Text(
             'Follow along gently, or breathe at your own comfortable pace.',
           ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Vibration cues'),
+            subtitle: const Text(
+              'Optional short pulses; device settings and support apply.',
+            ),
+            value: vibration,
+            onChanged: (value) => setState(() {
+              vibration = value;
+              haptics.cancel();
+            }),
+          ),
           Wrap(
             spacing: 8,
             children: [
@@ -137,6 +189,7 @@ class _BreathingSectionState extends State<BreathingSection>
                   onSelected: clock.running
                       ? null
                       : (_) => setState(() {
+                          haptics.cancel();
                           clock.reset();
                           clock.duration = Duration(minutes: minutes);
                         }),
@@ -202,10 +255,19 @@ class _BreathingSectionState extends State<BreathingSection>
               ),
               OutlinedButton(
                 onPressed: () {
+                  haptics.cancel();
                   ticker.stop();
                   setState(clock.reset);
                 },
                 child: const Text('Reset'),
+              ),
+              TextButton(
+                onPressed: () {
+                  pause(feedback: false);
+                  setState(clock.reset);
+                  cue(BreathCue.finish);
+                },
+                child: const Text('Stop session'),
               ),
             ],
           ),
