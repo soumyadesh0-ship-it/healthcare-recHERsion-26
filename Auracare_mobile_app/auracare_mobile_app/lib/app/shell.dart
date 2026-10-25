@@ -1,87 +1,150 @@
 import 'package:flutter/material.dart';
 
 import 'auth_service.dart';
-import 'theme.dart';
 import 'session.dart';
-import '../core/widgets.dart';
+import 'theme.dart';
 import '../core/brand.dart';
+import '../core/widgets.dart';
 import '../features/home/home.dart';
 import '../features/timeline/timeline.dart';
 import '../features/learn/learn.dart';
 import '../features/insights/insights.dart';
 import '../features/profile/profile.dart';
 import '../features/appointments/doctor.dart';
+import '../features/pcos_quiz/quiz.dart';
+import '../features/logging/editor.dart';
+
+enum AppDestination {
+  home('Home', Icons.home_outlined),
+  wellbeing('Wellbeing', Icons.spa_outlined),
+  doctor('Doctor', Icons.medical_services_outlined),
+  timeline('Timeline', Icons.calendar_month_outlined),
+  quiz('PCOS Quiz', Icons.assignment_outlined);
+
+  const AppDestination(this.label, this.icon);
+  final String label;
+  final IconData icon;
+  String get route => '/app/$name';
+  static AppDestination? fromRoute(String? route) => values
+      .where((d) => d.route == route || (d == quiz && route == '/app/pcos'))
+      .firstOrNull;
+}
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, this.onSignOut, this.authUser});
-  final Future<void> Function()? onSignOut;
+  const AppShell({
+    super.key,
+    this.initialDestination = AppDestination.home,
+    this.authUser,
+    this.onSignOut,
+  });
+  final AppDestination initialDestination;
   final AuthUser? authUser;
+  final Future<void> Function()? onSignOut;
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
-  int index = 0;
+  final scaffold = GlobalKey<ScaffoldState>();
+  late AppDestination selected = widget.initialDestination;
   int? lastHomeRequest;
+  final visited = <AppDestination>{};
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final request = SessionScope.of(context).homeRequest;
-    if (lastHomeRequest != null && lastHomeRequest != request) index = 0;
+    if (lastHomeRequest != null && lastHomeRequest != request) {
+      selected = AppDestination.home;
+    }
     lastHomeRequest = request;
+    visited.add(selected);
+    if (selected == AppDestination.doctor) loadAppointments();
   }
 
-  void select(int value) {
-    setState(() => index = value);
+  void loadAppointments() {
     final repo = SessionScope.of(context).appointments;
-    if (value == 4 && !repo.loaded && !repo.busy) repo.load();
+    if (!repo.loaded && !repo.busy) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) repo.load();
+      });
+    }
   }
 
-  static const labels = [
-    'Home',
-    'Timeline',
-    'Learn',
-    'Insights',
-    'Doctor',
-    'Profile',
-  ];
-  static const icons = [
-    Icons.home_outlined,
-    Icons.calendar_month_outlined,
-    Icons.menu_book_outlined,
-    Icons.insights_outlined,
-    Icons.medical_services_outlined,
-    Icons.person_outline,
-  ];
-  final pages = const [
-    HomePage(),
-    TimelinePage(),
-    LearnPage(),
-    InsightsPage(),
-    DoctorPage(),
-    ProfilePage(),
-  ];
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final tablet = size.width >= 600 && size.height >= 500;
-    final navigation = tablet ? _tabletNavigation() : _phoneNavigation(context);
-    final content = Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: IndexedStack(
-          index: index,
-          children: [
-            ...pages.take(5),
-            ProfilePage(authUser: widget.authUser, onSignOut: widget.onSignOut),
-          ],
-        ),
+  void select(AppDestination destination) {
+    setState(() {
+      selected = destination;
+      visited.add(destination);
+    });
+    if (destination == AppDestination.doctor) loadAppointments();
+  }
+
+  Widget page(AppDestination d) => switch (d) {
+    AppDestination.home => HomePage(
+      onWellbeing: () => select(AppDestination.wellbeing),
+      onQuiz: () => select(AppDestination.quiz),
+    ),
+    AppDestination.wellbeing => MoodCheckInPage(
+      embedded: true,
+      active: selected == d,
+    ),
+    AppDestination.doctor => const DoctorPage(),
+    AppDestination.timeline => const TimelinePage(),
+    AppDestination.quiz => QuizPage(
+      embedded: true,
+      active: selected == d,
+      onDoctor: () => select(AppDestination.doctor),
+      onExit: () => select(AppDestination.home),
+    ),
+  };
+  void drawerPage(Widget page, String route) {
+    Navigator.pop(context);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: RouteSettings(name: route),
+        builder: (_) => page is UnavailablePage
+            ? page
+            : Scaffold(
+                appBar: AppBar(title: const AuraCareBrandHeader()),
+                body: SafeArea(child: page),
+              ),
       ),
     );
+  }
 
-    return Scaffold(
+  Future<void> signOutAndReturn() async {
+    await widget.onSignOut?.call();
+    if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  Widget get profile => ProfilePage(
+    authUser: widget.authUser,
+    onSignOut: widget.onSignOut == null ? null : signOutAndReturn,
+  );
+
+  Widget drawerItem(String title, IconData icon, Widget page, String route) =>
+      ListTile(
+        leading: Icon(icon),
+        title: Text(title),
+        onTap: () => drawerPage(page, route),
+      );
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: selected == AppDestination.home || selected == AppDestination.quiz,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop && selected != AppDestination.quiz) {
+        select(AppDestination.home);
+      }
+    },
+    child: Scaffold(
+      key: scaffold,
       appBar: AppBar(
-        title: index == 0 ? const AuraCareBrandHeader() : Text(labels[index]),
+        leading: IconButton(
+          key: const ValueKey('open-drawer'),
+          tooltip: 'Open navigation menu',
+          onPressed: () => scaffold.currentState!.openDrawer(),
+          icon: const AuraLogoIcon(),
+        ),
+        title: const Text('auracare'),
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(
             demoBadgeHeight(context, isAuthenticated: widget.authUser != null),
@@ -89,120 +152,181 @@ class _AppShellState extends State<AppShell> {
           child: DemoBadge(isAuthenticated: widget.authUser != null),
         ),
       ),
+      drawer: Drawer(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    const AuraLogo(width: 160),
+                    drawerItem(
+                      'Profile',
+                      Icons.person_outline,
+                      profile,
+                      '/app/profile',
+                    ),
+                    drawerItem(
+                      'Learn',
+                      Icons.menu_book_outlined,
+                      const LearnPage(),
+                      '/app/learn',
+                    ),
+                    drawerItem(
+                      'Insights',
+                      Icons.insights_outlined,
+                      const InsightsPage(),
+                      '/app/insights',
+                    ),
+                    const Divider(),
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('More from Auracare'),
+                    ),
+                    drawerItem(
+                      'AI Assistant',
+                      Icons.chat_bubble_outline,
+                      const UnavailablePage(
+                        'AI Assistant',
+                        'No AI or report-processing service is connected. No uploads or health records are sent.',
+                      ),
+                      '/app/assistant',
+                    ),
+                    drawerItem(
+                      'Sisterhood',
+                      Icons.people_outline,
+                      const UnavailablePage(
+                        'Sisterhood',
+                        'Community and moderation are not connected. Private records are never shared.',
+                      ),
+                      '/app/sisterhood',
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.local_hospital_outlined),
+                      title: const Text('Appointment & Clinic'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        select(AppDestination.doctor);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                key: const ValueKey('profile-footer'),
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: Text(
+                  widget.authUser?.displayName ??
+                      (widget.authUser == null ? 'Alex' : 'Your account'),
+                ),
+                subtitle: Text(
+                  widget.authUser?.email ??
+                      (widget.authUser == null ? 'Demo profile' : 'Signed in'),
+                ),
+                onTap: () => drawerPage(profile, '/app/profile'),
+              ),
+            ],
+          ),
+        ),
+      ),
       body: SafeArea(
         top: false,
         bottom: false,
-        child: tablet
-            ? Row(
-                children: [
-                  navigation,
-                  const VerticalDivider(width: 1),
-                  Expanded(child: content),
-                ],
-              )
-            : content,
+        child: IndexedStack(
+          index: AppDestination.values.indexOf(selected),
+          children: [
+            for (final d in AppDestination.values)
+              TickerMode(
+                enabled: selected == d,
+                child: visited.contains(d) ? page(d) : const SizedBox.shrink(),
+              ),
+          ],
+        ),
       ),
-      bottomNavigationBar: tablet ? null : navigation,
-    );
-  }
-
-  Widget _tabletNavigation() => NavigationRail(
-    selectedIndex: index,
-    onDestinationSelected: select,
-    labelType: NavigationRailLabelType.all,
-    indicatorColor: Palette.blush,
-    destinations: List.generate(
-      labels.length,
-      (i) => NavigationRailDestination(
-        icon: Icon(icons[i], key: ValueKey('tab-${labels[i]}')),
-        selectedIcon: Icon(icons[i], key: ValueKey('tab-${labels[i]}')),
-        label: Text(labels[i]),
-      ),
-    ),
-  );
-
-  Widget _phoneNavigation(BuildContext context) => SafeArea(
-    top: false,
-    child: Material(
-      color: Palette.mist,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final textScale = MediaQuery.textScalerOf(context).scale(12);
-          final scrolls = constraints.maxWidth < 360 || textScale > 15;
-          final itemWidth = scrolls
-              ? 72.0
-              : constraints.maxWidth / labels.length;
-          final destinations = List.generate(
-            labels.length,
-            (i) => SizedBox(
-              width: itemWidth,
-              child: Semantics(
-                selected: index == i,
-                button: true,
-                label: labels[i],
-                excludeSemantics: true,
-                child: InkWell(
-                  key: ValueKey('tab-${labels[i]}'),
-                  onTap: () => select(i),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 6,
-                      horizontal: 2,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Material(
+          color: Palette.white,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final labelSize = MediaQuery.textScalerOf(context).scale(12);
+              final minimumWidth =
+                  64.0 + (labelSize > 12 ? (labelSize - 12) * 5 : 0);
+              final itemWidth =
+                  (constraints.maxWidth / AppDestination.values.length).clamp(
+                    minimumWidth,
+                    double.infinity,
+                  );
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: MediaQuery.sizeOf(context).width,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      for (final d in AppDestination.values)
+                        Semantics(
+                          selected: selected == d,
+                          button: true,
+                          label: d.label,
+                          excludeSemantics: true,
+                          child: SizedBox(
+                            width: itemWidth,
+                            child: InkWell(
+                              key: ValueKey('tab-${d.label}'),
+                              onTap: () => select(d),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                  vertical: 10,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: selected == d
+                                            ? Palette.blush
+                                            : Palette.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 4,
+                                        ),
+                                        child: Icon(d.icon, color: Palette.ink),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      d.label,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: selected == d
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: index == i ? Palette.blush : Palette.mist,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(icons[i], color: Palette.plum, size: 20),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          labels[i],
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: index == i
-                                ? FontWeight.w700
-                                : FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
-              ),
-            ),
-          );
-
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: scrolls
-                ? SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: destinations,
-                    ),
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: destinations
-                        .map((destination) => Expanded(child: destination))
-                        .toList(),
-                  ),
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     ),
   );

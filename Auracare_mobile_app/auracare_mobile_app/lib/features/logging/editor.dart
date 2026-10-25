@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/session.dart';
+import '../../app/navigation.dart';
 import '../../core/widgets.dart';
 import '../../core/calendar.dart';
 import '../../core/characters.dart';
@@ -8,6 +9,7 @@ import '../../app/theme.dart';
 import '../../data/records.dart';
 import '../wellbeing/merge_game.dart';
 import '../wellbeing/breathing.dart';
+import '../wellbeing/wellbeing.dart';
 import 'period_picker.dart';
 
 void openEditor(
@@ -30,7 +32,7 @@ class EntryEditor extends StatefulWidget {
     this.day,
     this.initialMood,
     this.showCalendar = true,
-    this.allowNotes = true,
+    this.allowNotes = false,
     this.onContinueJournal,
   });
   final String? initialMood;
@@ -169,9 +171,9 @@ class _EntryEditorState extends State<EntryEditor> {
               : selection!,
           when: when!,
           zone: zone!,
-          note: widget.type == EntryType.bleeding && !widget.allowNotes
-              ? (widget.entry?.note ?? '')
-              : note.text.trim(),
+          note: widget.type == EntryType.journal || widget.allowNotes
+              ? note.text.trim()
+              : (widget.entry?.note ?? ''),
           severity: severity,
           version: (widget.entry?.version ?? 0) + 1,
           periodStart: widget.type == EntryType.bleeding ? periodStart : null,
@@ -699,7 +701,7 @@ class _EntryEditorState extends State<EntryEditor> {
                             },
                       child: const Text('Continue in Journal'),
                     ),
-                  if (widget.type != EntryType.bleeding || widget.allowNotes)
+                  if (widget.type == EntryType.journal || widget.allowNotes)
                     TextFormField(
                       controller: note,
                       key: const ValueKey('entry-note'),
@@ -789,13 +791,7 @@ class LogEntryPage extends StatelessWidget {
           Icons.waves_outlined,
           Palette.turquoise,
         ),
-        (
-          'Mood',
-          EntryType.wellness,
-          Icons.sentiment_satisfied_alt,
-          Palette.yellow,
-        ),
-        ('Notes', EntryType.journal, Icons.edit_note, Palette.blue),
+        ('Journal', EntryType.journal, Icons.edit_note, Palette.blue),
       ])
         Material(
           color: Palette.input,
@@ -822,12 +818,36 @@ class LogEntryPage extends StatelessWidget {
 }
 
 class MoodCheckInPage extends StatefulWidget {
-  const MoodCheckInPage({super.key});
+  const MoodCheckInPage({super.key, this.embedded = false, this.active = true});
+  final bool embedded, active;
   @override
   State<MoodCheckInPage> createState() => _MoodCheckInPageState();
 }
 
-class _MoodCheckInPageState extends State<MoodCheckInPage> {
+class _MoodCheckInPageState extends State<MoodCheckInPage> with RouteAware {
+  ModalRoute<dynamic>? route;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = ModalRoute.of(context);
+    if (route != next) {
+      auraRouteObserver.unsubscribe(this);
+      route = next;
+      if (next != null) auraRouteObserver.subscribe(this, next);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    if (mounted) setState(() => selected = null);
+  }
+
+  @override
+  void dispose() {
+    auraRouteObserver.unsubscribe(this);
+    super.dispose();
+  }
+
   int? selected;
   final breathingKey = GlobalKey();
   static const moods = [
@@ -869,7 +889,14 @@ class _MoodCheckInPageState extends State<MoodCheckInPage> {
     ),
   ];
   @override
+  void didUpdateWidget(covariant MoodCheckInPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.active && oldWidget.active) selected = null;
+  }
+
+  @override
   Widget build(BuildContext context) => PageFrame(
+    embedded: widget.embedded,
     title: 'Wellbeing check-in',
     children: [
       const Heading('How are you feeling today?'),
@@ -933,44 +960,21 @@ class _MoodCheckInPageState extends State<MoodCheckInPage> {
           ),
         ),
       ),
-      ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 100),
-        child: Semantics(
-          liveRegion: true,
-          child: selected == null
-              ? const SizedBox.shrink()
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      moods[selected!].$4,
-                      key: const ValueKey('mood-feedback'),
-                    ),
-                    if (selected == 4)
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          TextButton(
-                            onPressed: () => Scrollable.ensureVisible(
-                              breathingKey.currentContext!,
-                              duration: MediaQuery.disableAnimationsOf(context)
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 200),
-                            ),
-                            child: const Text('Try breathing'),
-                          ),
-                          TextButton(
-                            onPressed: () =>
-                                pushPage(context, const MergeGamePage()),
-                            child: const Text('Play Merge & Unwind'),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
+      if (selected != null)
+        MoodFeedback(
+          key: ValueKey(selected),
+          mood: moods[selected!].$3,
+          kind: moods[selected!].$2,
+          heading: moods[selected!].$1,
+          message: moods[selected!].$4,
+          onBreathing: () => Scrollable.ensureVisible(
+            breathingKey.currentContext!,
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 200),
+          ),
         ),
-      ),
-      BreathingSection(key: breathingKey),
+      BreathingSection(key: breathingKey, active: widget.active),
     ],
   );
 }

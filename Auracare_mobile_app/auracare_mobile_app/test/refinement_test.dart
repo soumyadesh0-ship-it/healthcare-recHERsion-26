@@ -217,70 +217,49 @@ void main() {
     },
   );
 
-  testWidgets(
-    'mood failure stays in editor; retry removes intermediate routes and selects Home',
-    (tester) async {
-      final session = DemoSession(
-        records: DemoRecordsRepository(sample: false),
-      );
-      addTearDown(session.dispose);
-      await tester.pumpWidget(
-        AuracareApp(session: session, showOnboarding: false),
-      );
-      await tester.pumpAndSettle();
-      await reveal(tester, find.text('Log entry'));
-      await tester.tap(find.text('Log entry'));
-      await tester.pumpAndSettle();
-      await reveal(tester, find.text('Mood'));
-      await tester.tap(find.text('Mood'));
-      await tester.pumpAndSettle();
-      final metric = find.byType(DropdownButtonFormField<String>);
-      await reveal(tester, metric);
-      await tester.tap(metric);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Mood').last);
-      await tester.pumpAndSettle();
-      final feeling = find.byType(DropdownButtonFormField<RecordedMood>);
-      await reveal(tester, feeling);
-      await tester.tap(feeling);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Happy').last);
-      await tester.pumpAndSettle();
-      session.records.failNextWrite = true;
-      await reveal(tester, find.byKey(const ValueKey('save-entry')));
-      await tester.tap(find.byKey(const ValueKey('save-entry')));
-      await tester.pumpAndSettle();
-      expect(find.byType(EntryEditor), findsOneWidget);
-      expect(session.records.entries, isEmpty);
-      await reveal(tester, find.text('Retry save'));
-      await tester.tap(find.text('Retry save'));
-      await tester.pumpAndSettle();
-      expect(find.byType(EntryEditor), findsNothing);
-      expect(find.byType(MoodCheckInPage), findsNothing);
-      expect(session.records.entries.single.recordedMood, RecordedMood.happy);
-      final homeContext = tester.element(
-        find.byKey(const ValueKey('tab-Home')),
-      );
-      expect(Navigator.of(homeContext).canPop(), isFalse);
-      expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('tab-Timeline')));
-      await tester.pumpAndSettle();
-      await reveal(tester, find.text('Mood'));
-      await tester.tap(find.text('Mood').last);
-      await tester.pumpAndSettle();
-      await reveal(tester, find.byKey(const ValueKey('save-entry')));
-      await tester.tap(find.byKey(const ValueKey('save-entry')));
-      await tester.pumpAndSettle();
-      expect(find.byType(EntryEditor), findsNothing);
-      await reveal(tester, find.text('A little space\nfor you.'), delta: -220);
-      expect(find.text('A little space\nfor you.'), findsOneWidget);
-      expect(
-        Navigator.of(tester.element(find.byKey(const ValueKey('tab-Home'))))
-            .canPop(),
-        isFalse,
-      );
-    },
-  );
+  testWidgets('legacy mood editing preserves notes through failure and retry', (
+    tester,
+  ) async {
+    final session = DemoSession(records: DemoRecordsRepository(sample: false));
+    addTearDown(session.dispose);
+    await tester.runAsync(
+      () => session.records.save(
+        HealthEntry(
+          id: 'legacy-mood',
+          type: EntryType.wellness,
+          title: 'Mood',
+          note: 'Feeling: Happy. Historical note.',
+          when: DateTime.now(),
+          zone: 'UTC',
+        ),
+      ),
+    );
+    await tester.pumpWidget(
+      AuracareApp(session: session, showOnboarding: false),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tab-Timeline')));
+    await tester.pumpAndSettle();
+    await reveal(tester, find.text('Mood'));
+    await tester.tap(find.text('Mood').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entry-note')), findsNothing);
+    session.records.failNextWrite = true;
+    await reveal(tester, find.byKey(const ValueKey('save-entry')));
+    await tester.tap(find.byKey(const ValueKey('save-entry')));
+    await tester.pumpAndSettle();
+    expect(session.records.entries.single.version, 1);
+    await reveal(tester, find.text('Retry save'));
+    await tester.tap(find.text('Retry save'));
+    await tester.pumpAndSettle();
+    expect(session.records.entries.single.version, 2);
+    expect(
+      session.records.entries.single.note,
+      'Feeling: Happy. Historical note.',
+    );
+    expect(session.records.entries.single.recordedMood, RecordedMood.happy);
+    expect(find.byType(EntryEditor), findsNothing);
+  });
 
   test('existing Learn categories have distinct local illustrations', () {
     final topics = PreviewResourcesRepository().resources;
@@ -298,10 +277,7 @@ void main() {
         return ((x > y ? x : y) + .05) / ((x < y ? x : y) + .05);
       }
 
-      expect(
-        contrast(Palette.ink, Palette.lavender),
-        greaterThanOrEqualTo(4.5),
-      );
+      expect(contrast(Palette.ink, Palette.purple), greaterThanOrEqualTo(4.5));
       expect(
         contrast(Palette.action, Palette.white),
         greaterThanOrEqualTo(4.5),

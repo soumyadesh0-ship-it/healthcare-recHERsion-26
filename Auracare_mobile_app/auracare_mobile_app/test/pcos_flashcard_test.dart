@@ -77,7 +77,7 @@ void main() {
         await tap(tester, i == quizFields.length - 1 ? 'Review' : 'Next');
         expect(tester.takeException(), isNull);
       }
-      await tap(tester, 'Are periods regular?');
+      await tap(tester, 'Are your periods regular?');
       final edited = tester.widget<QuizFlashcard>(find.byType(QuizFlashcard));
       expect(edited.answered, isTrue);
       expect(edited.selected, isNull);

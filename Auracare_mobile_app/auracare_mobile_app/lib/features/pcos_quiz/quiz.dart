@@ -9,7 +9,17 @@ import '../../data/services.dart';
 import '../../data/model_quiz_service.dart';
 
 class QuizPage extends StatefulWidget {
-  const QuizPage({super.key});
+  const QuizPage({
+    super.key,
+    this.embedded = false,
+    this.active = true,
+    this.onDoctor,
+    this.onExit,
+    this.service,
+  });
+  final bool embedded, active;
+  final VoidCallback? onDoctor, onExit;
+  final QuizService? service;
   @override
   State<QuizPage> createState() => _QuizPageState();
 }
@@ -156,9 +166,11 @@ class _QuizPageState extends State<QuizPage> {
       });
       return;
     }
-    final QuizService service = scenario == QuizOutcome.unavailable
-        ? LiveUnavailableQuizService()
-        : DemoQuizService(scenario: scenario);
+    final QuizService service =
+        widget.service ??
+        (scenario == QuizOutcome.unavailable
+            ? LiveUnavailableQuizService()
+            : DemoQuizService(scenario: scenario));
     try {
       final result = await service.assess(answers);
       if (!mounted || requestGeneration != generation) return;
@@ -349,7 +361,12 @@ class _QuizPageState extends State<QuizPage> {
               outcome = null;
             });
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) Navigator.pop(context);
+              if (!mounted) return;
+              if (widget.embedded) {
+                widget.onExit?.call();
+              } else {
+                Navigator.pop(context);
+              }
             });
           },
           child: const Text('Return to Auracare'),
@@ -592,31 +609,43 @@ class _QuizPageState extends State<QuizPage> {
       );
     }
     return PopScope(
-      canPop: step < 0 && !busy,
+      canPop: !widget.active || (!widget.embedded && step < 0 && !busy),
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) back();
+        if (!didPop && widget.active) {
+          if (widget.embedded && step < 0 && !busy) {
+            widget.onExit?.call();
+          } else {
+            back();
+          }
+        }
       },
-      child: Scaffold(
-        appBar: AppBar(title: const Text('Experimental PCOS quiz')),
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                controller: scroll,
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 520),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: spaced(body),
-                    ),
-                  ),
+      child: widget.embedded
+          ? quizContent(body)
+          : Scaffold(
+              appBar: AppBar(title: const Text('Experimental PCOS quiz')),
+              body: quizContent(body),
+            ),
+    );
+  }
+
+  Widget quizContent(List<Widget> body) {
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            controller: scroll,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: spaced(body),
                 ),
-              );
-            },
-          ),
-        ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

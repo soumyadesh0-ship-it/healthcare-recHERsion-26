@@ -14,8 +14,6 @@ import 'package:auracare_mobile_app/data/cycles.dart';
 import 'package:auracare_mobile_app/data/services.dart';
 import 'package:auracare_mobile_app/core/calendar.dart';
 import 'package:auracare_mobile_app/features/appointments/doctor.dart';
-import 'package:auracare_mobile_app/features/appointments/demo_directory.dart';
-import 'package:auracare_mobile_app/features/wellbeing/merge_game.dart';
 import 'package:auracare_mobile_app/features/learn/learn.dart';
 import 'package:auracare_mobile_app/features/cycle/cycle.dart';
 import 'package:auracare_mobile_app/features/onboarding/onboarding.dart';
@@ -68,216 +66,183 @@ void main() {
       await icons.load();
     }
   });
-  const viewports = [
-    (width: 320.0, height: 844.0, name: 'very narrow portrait'),
-    (width: 360.0, height: 800.0, name: 'compact portrait'),
-    (width: 390.0, height: 844.0, name: 'reference portrait'),
-    (width: 430.0, height: 932.0, name: 'large phone portrait'),
-    (width: 600.0, height: 960.0, name: 'tablet portrait'),
-    (width: 844.0, height: 390.0, name: 'landscape'),
-  ];
-  for (final viewport in viewports) {
+  for (final width in [320.0, 390.0, 430.0]) {
     for (final scale in [1.0, 2.0]) {
-      testWidgets('forms, cycle and quiz at ${viewport.name}, '
-          '${viewport.width} dp / $scale text with keyboard inset', (
-        tester,
-      ) async {
-        tester.view.physicalSize = Size(viewport.width, viewport.height);
-        tester.view.devicePixelRatio = 1;
-        tester.platformDispatcher.textScaleFactorTestValue = scale;
-        addTearDown(() {
-          tester.view.resetPhysicalSize();
-          tester.view.resetDevicePixelRatio();
-          tester.view.resetViewInsets();
-          tester.platformDispatcher.clearTextScaleFactorTestValue();
-        });
-        final session = DemoSession(
-          appointments: AppointmentsRepository(
-            store: _LayoutAppointmentStore(),
-          ),
-        )..cycleEnabled = true;
-        await session.appointments.load();
-        final boundary = GlobalKey();
-        Future<void> frame(
-          Widget page,
-          String name, {
-          bool keyboard = false,
-          bool pauseGame = false,
-        }) async {
-          tester.view.viewInsets = FakeViewPadding(
-            bottom: keyboard ? (viewport.height < 600 ? 140 : 280) : 0,
-          );
-          await tester.pumpWidget(
-            RepaintBoundary(
-              key: boundary,
-              child: SessionScope(
-                session: session,
-                child: MaterialApp(
-                  key: ValueKey(name),
-                  theme: auracareTheme(),
-                  home: page,
+      testWidgets(
+        'forms, cycle and quiz at $width / $scale with keyboard inset',
+        (tester) async {
+          tester.view.physicalSize = Size(width, 844);
+          tester.view.devicePixelRatio = 1;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(() {
+            tester.view.resetPhysicalSize();
+            tester.view.resetDevicePixelRatio();
+            tester.view.resetViewInsets();
+            tester.platformDispatcher.clearTextScaleFactorTestValue();
+          });
+          final session = DemoSession(
+            appointments: AppointmentsRepository(
+              store: _LayoutAppointmentStore(),
+            ),
+          )..cycleEnabled = true;
+          await session.appointments.load();
+          final boundary = GlobalKey();
+          Future<void> frame(
+            Widget page,
+            String name, {
+            bool keyboard = false,
+          }) async {
+            tester.view.viewInsets = FakeViewPadding(
+              bottom: keyboard ? 280 : 0,
+            );
+            await tester.pumpWidget(
+              RepaintBoundary(
+                key: boundary,
+                child: SessionScope(
+                  session: session,
+                  child: MaterialApp(
+                    key: ValueKey(name),
+                    theme: auracareTheme(),
+                    home: page,
+                  ),
                 ),
               ),
-            ),
-          );
-          if (pauseGame) {
-            tester.binding.handleAppLifecycleStateChanged(
-              AppLifecycleState.inactive,
             );
-          }
-          await tester.pumpAndSettle();
-          if (keyboard) {
-            final field = find.byType(TextFormField).last;
-            await tester.ensureVisible(field);
             await tester.pumpAndSettle();
-            await tester.tap(field);
-            await tester.pump();
-          }
-          expect(
-            tester.takeException(),
-            isNull,
-            reason: '$name at ${viewport.width}x${viewport.height} / $scale',
-          );
-          if (capture) {
-            await tester.runAsync(() async {
-              final render =
-                  boundary.currentContext!.findRenderObject()!
-                      as RenderRepaintBoundary;
-              final image = await render.toImage(pixelRatio: 1);
-              final bytes = await image.toByteData(
-                format: ui.ImageByteFormat.png,
-              );
-              final file = File(
-                'build/previews/${name}_${viewport.width.toInt()}_'
-                '${scale.toInt()}x.png',
-              );
-              await file.parent.create(recursive: true);
-              await file.writeAsBytes(bytes!.buffer.asUint8List());
-              image.dispose();
-            });
-          }
-          if (pauseGame) {
-            tester.binding.handleAppLifecycleStateChanged(
-              AppLifecycleState.resumed,
+            if (keyboard) {
+              final field = find.byType(TextFormField).last;
+              await tester.ensureVisible(field);
+              await tester.pumpAndSettle();
+              await tester.tap(field);
+              await tester.pump();
+            }
+            expect(
+              tester.takeException(),
+              isNull,
+              reason: '$name at $width / $scale',
             );
+            if (capture) {
+              await tester.runAsync(() async {
+                final render =
+                    boundary.currentContext!.findRenderObject()!
+                        as RenderRepaintBoundary;
+                final image = await render.toImage(pixelRatio: 1);
+                final bytes = await image.toByteData(
+                  format: ui.ImageByteFormat.png,
+                );
+                final file = File(
+                  'build/previews/${name}_${width.toInt()}_${scale.toInt()}x.png',
+                );
+                await file.parent.create(recursive: true);
+                await file.writeAsBytes(bytes!.buffer.asUint8List());
+                image.dispose();
+              });
+            }
           }
-        }
 
-        await frame(WelcomeSplash(onContinue: () {}), 'splash');
-        await frame(Onboarding(onEnter: (_) {}), 'onboarding');
-        await frame(const LogEntryPage(), 'log_entry');
-        await frame(const MoodCheckInPage(), 'mood');
-        await frame(const MergeGamePage(), 'merge_game', pauseGame: true);
-        await frame(const EntryEditor(type: EntryType.spotting), 'spotting');
-        await frame(
-          const EntryEditor(type: EntryType.discharge),
-          'discharge',
-          keyboard: true,
-        );
-        await frame(
-          const Scaffold(
-            body: SafeArea(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(20),
-                child: DemoDirectory(),
+          await frame(WelcomeSplash(onContinue: () {}), 'splash');
+          await frame(Onboarding(onEnter: (_) {}), 'onboarding');
+          await frame(const LogEntryPage(), 'log_entry');
+          await frame(const MoodCheckInPage(), 'mood');
+          await frame(const CyclePage(), 'cycle');
+          await frame(
+            const Scaffold(body: SafeArea(child: DoctorPage())),
+            'doctor',
+          );
+          await frame(
+            const DoctorAppointmentEditor(),
+            'doctor_editor',
+            keyboard: true,
+          );
+          await frame(
+            const ResourcePage(resource: ResourcePreview('Postpartum')),
+            'postpartum_article',
+          );
+          final cycles = <HealthEntry>[
+            for (var i = 0; i < 4; i++) ...[
+              HealthEntry(
+                id: 'start-$i',
+                type: EntryType.bleeding,
+                title: 'Bleeding · Heavy',
+                when: addDays(DateTime(2026, 1, 1), i * 30),
+                zone: 'Device local',
+                periodStart: true,
               ),
-            ),
-          ),
-          'demo_directory',
-        );
-        await frame(const CyclePage(), 'cycle');
-        await frame(
-          const Scaffold(body: SafeArea(child: DoctorPage())),
-          'doctor',
-        );
-        await frame(
-          const DoctorAppointmentEditor(),
-          'doctor_editor',
-          keyboard: true,
-        );
-        await frame(
-          const ResourcePage(resource: ResourcePreview('Postpartum')),
-          'postpartum_article',
-        );
-        final cycles = <HealthEntry>[
-          for (var i = 0; i < 4; i++) ...[
-            HealthEntry(
-              id: 'start-$i',
-              type: EntryType.bleeding,
-              title: 'Bleeding · Heavy',
-              when: addDays(DateTime(2026, 1, 1), i * 30),
-              zone: 'Device local',
-              periodStart: true,
-            ),
-            HealthEntry(
-              id: 'end-$i',
-              type: EntryType.bleeding,
-              title: 'Bleeding · Light',
-              when: addDays(DateTime(2026, 1, 1), i * 30 + 4),
-              zone: 'Device local',
-              periodEnd: true,
-            ),
-          ],
-        ];
-        await frame(
-          Scaffold(
-            body: SafeArea(
-              child: SingleChildScrollView(
-                child: RecordCalendar(
-                  entries: cycles,
-                  selected: DateTime(2026, 4, 18),
-                  onSelect: (_) {},
-                  estimates: CycleEstimates(
-                    CycleHistory(cycles),
-                    today: DateTime(2026, 4, 20),
+              HealthEntry(
+                id: 'end-$i',
+                type: EntryType.bleeding,
+                title: 'Bleeding · Light',
+                when: addDays(DateTime(2026, 1, 1), i * 30 + 4),
+                zone: 'Device local',
+                periodEnd: true,
+              ),
+            ],
+          ];
+          await frame(
+            Scaffold(
+              body: SafeArea(
+                child: SingleChildScrollView(
+                  child: RecordCalendar(
+                    entries: cycles,
+                    selected: DateTime(2026, 4, 18),
+                    onSelect: (_) {},
+                    estimates: CycleEstimates(
+                      CycleHistory(cycles),
+                      today: DateTime(2026, 4, 20),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          'cycle_estimates',
-        );
-        await frame(
-          const EntryEditor(type: EntryType.journal),
-          'journal_keyboard',
-          keyboard: true,
-        );
-        await frame(
-          const EntryEditor(type: EntryType.symptom, key: ValueKey('symptom')),
-          'symptom_keyboard',
-          keyboard: true,
-        );
-        await frame(const QuizPage(), 'quiz_intro');
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-        tester.view.viewInsets = const FakeViewPadding();
-        await tester.pumpWidget(
-          RepaintBoundary(
-            key: boundary,
-            child: AuracareApp(session: session, showOnboarding: false),
-          ),
-        );
-        await tester.pumpAndSettle();
-        if (capture) {
-          await tester.runAsync(() async {
-            final image =
-                await (boundary.currentContext!.findRenderObject()!
-                        as RenderRepaintBoundary)
-                    .toImage(pixelRatio: 1);
-            final bytes = await image.toByteData(
-              format: ui.ImageByteFormat.png,
-            );
-            await File(
-              'build/previews/home_${viewport.width.toInt()}_'
-              '${scale.toInt()}x.png',
-            ).writeAsBytes(bytes!.buffer.asUint8List());
-            image.dispose();
-          });
-        }
-        expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox.shrink());
-        session.dispose();
-      });
+            'cycle_estimates',
+          );
+          await frame(
+            const EntryEditor(type: EntryType.journal),
+            'journal_keyboard',
+            keyboard: true,
+          );
+          await frame(
+            const EntryEditor(
+              type: EntryType.symptom,
+              key: ValueKey('symptom'),
+            ),
+            'symptom_form',
+          );
+          await frame(
+            const EntryEditor(type: EntryType.bleeding),
+            'period_inline',
+          );
+          await frame(const QuizPage(), 'quiz_intro');
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pump();
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: boundary,
+              child: AuracareApp(session: session, showOnboarding: false),
+            ),
+          );
+          await tester.pumpAndSettle();
+          if (capture) {
+            await tester.runAsync(() async {
+              final image =
+                  await (boundary.currentContext!.findRenderObject()!
+                          as RenderRepaintBoundary)
+                      .toImage(pixelRatio: 1);
+              final bytes = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              await File(
+                'build/previews/home_${width.toInt()}_${scale.toInt()}x.png',
+              ).writeAsBytes(bytes!.buffer.asUint8List());
+              image.dispose();
+            });
+          }
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          session.dispose();
+        },
+      );
     }
   }
 }

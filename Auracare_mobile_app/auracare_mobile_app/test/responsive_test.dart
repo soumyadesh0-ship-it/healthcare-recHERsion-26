@@ -13,14 +13,7 @@ class _ResponsiveAppointmentStore implements AppointmentStore {
 }
 
 void main() {
-  const destinations = [
-    'Home',
-    'Timeline',
-    'Learn',
-    'Insights',
-    'Doctor',
-    'Profile',
-  ];
+  const destinations = ['Home', 'Timeline', 'Wellbeing', 'Doctor', 'PCOS Quiz'];
   const viewports = [
     (width: 320.0, height: 844.0, name: 'very narrow portrait'),
     (width: 360.0, height: 800.0, name: 'compact portrait'),
@@ -54,39 +47,25 @@ void main() {
         await tester.pumpAndSettle();
 
         for (var i = 0; i < destinations.length; i++) {
-          final tablet = viewport.width >= 600 && viewport.height >= 500;
-          final tab = tablet
-              ? find.text(destinations[i])
-              : find.byKey(ValueKey('tab-${destinations[i]}'));
+          final tab = find.byKey(ValueKey('tab-${destinations[i]}'));
           expect(tab, findsOneWidget);
           await tester.ensureVisible(tab);
-          if (!tablet) {
-            expect(tester.getSemantics(tab).label, destinations[i]);
-          }
+          expect(tester.getSemantics(tab).label, destinations[i]);
           await tester.tap(tab);
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          if (tablet) {
-            expect(
-              tester
-                  .widget<NavigationRail>(find.byType(NavigationRail))
-                  .selectedIndex,
-              i,
-            );
-          } else {
-            final tabSemantics = find.ancestor(
-              of: tab,
-              matching: find.byWidgetPredicate(
-                (widget) =>
-                    widget is Semantics &&
-                    widget.properties.label == destinations[i],
-              ),
-            );
-            expect(
-              tester.widget<Semantics>(tabSemantics).properties.selected,
-              true,
-            );
-          }
+          final tabSemantics = find.ancestor(
+            of: tab,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Semantics &&
+                  widget.properties.label == destinations[i],
+            ),
+          );
+          expect(
+            tester.widget<Semantics>(tabSemantics).properties.selected,
+            true,
+          );
         }
 
         await tester.pumpWidget(const SizedBox.shrink());

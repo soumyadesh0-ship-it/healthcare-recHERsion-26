@@ -13,7 +13,8 @@ import '../pcos_quiz/quiz.dart';
 import '../timeline/timeline.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.onWellbeing, this.onQuiz});
+  final VoidCallback? onWellbeing, onQuiz;
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
@@ -67,11 +68,12 @@ class HomePage extends StatelessWidget {
           onTap: () => pushPage(context, const JournalPage()),
         ),
         ActionCard(
-          title: 'Wellbeing check-in',
+          title: 'Wellbeing',
           color: Palette.lavender,
-          subtitle: 'Optional mood, energy, stress or sleep note',
+          subtitle: 'A little play or a gentle pause',
           icon: Icons.spa_outlined,
-          onTap: () => pushPage(context, const MoodCheckInPage()),
+          onTap:
+              onWellbeing ?? () => pushPage(context, const MoodCheckInPage()),
         ),
         ActionCard(
           title: 'PCOS quiz',
@@ -80,7 +82,7 @@ class HomePage extends StatelessWidget {
               ? 'Experimental questionnaire'
               : 'Experimental questionnaire demo',
           icon: Icons.assignment_outlined,
-          onTap: () => pushPage(context, const QuizPage()),
+          onTap: onQuiz ?? () => pushPage(context, const QuizPage()),
         ),
         ActionCard(
           title: 'Appointment preparation',
@@ -107,46 +109,6 @@ class HomePage extends StatelessWidget {
             onTap: () => openEditor(context, entry: e),
           ),
         ],
-        Text(
-          'More from Auracare',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        ActionCard(
-          title: 'AI Assistant',
-          subtitle: 'Information and reports — not connected',
-          icon: Icons.chat_bubble_outline,
-          onTap: () => pushPage(
-            context,
-            const UnavailablePage(
-              'AI Assistant',
-              'No AI or report-processing service is connected. No uploads or health records are sent. Use Learn previews or prepare your own questions.',
-            ),
-          ),
-        ),
-        ActionCard(
-          title: 'Sisterhood',
-          subtitle: 'Community — not connected',
-          icon: Icons.people_outline,
-          onTap: () => pushPage(
-            context,
-            const UnavailablePage(
-              'Sisterhood',
-              'Community and moderation are not connected. Private records never attach to community posts. Pseudonyms would not guarantee complete anonymity.',
-            ),
-          ),
-        ),
-        ActionCard(
-          title: 'Appointments & Clinic',
-          subtitle: 'Directory and booking — not connected',
-          icon: Icons.local_hospital_outlined,
-          onTap: () => pushPage(
-            context,
-            const UnavailablePage(
-              'Appointments & Clinic',
-              'No verified provider directory or booking integration exists. No appointment availability or confirmation is shown. Appointment preparation is available from Home.',
-            ),
-          ),
-        ),
       ]),
     );
   }
