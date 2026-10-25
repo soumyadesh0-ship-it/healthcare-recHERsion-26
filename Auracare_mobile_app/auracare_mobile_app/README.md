@@ -74,6 +74,33 @@ Then run the Supabase-configured command above so the public client configuratio
 
 See [redesign verification](../../docs/AURACARE_REDESIGN.md) for the current UI changes and verification. The following notes describe the original implementation audit: Android Doctor reported missing command-line tools and unknown license status. The debug build attempt failed when Gradle's JVM exhausted memory; test runs also initially encountered full disk space. Free adequate disk/RAM and complete the Android toolchain before building. iOS requires macOS/Xcode; no iOS build was attempted on Windows. Signing/provisioning has not been customized.
 
+## Minimal AI chat on a USB-connected Android phone
+
+Home and the navigation drawer open **AI Assistant** at `/app/assistant`.
+The Flutter client sends only `{"prompt":"your message"}` to `POST /chat`
+and displays the returned `response`. No conversation history or health records
+are included. Configure `GEMINI_API_KEY` only in the FastAPI backend environment
+or repository-root `.env.local` (ignored by Git), then restart the backend.
+The root `.env` is tracked in this repository; do not put the Gemini key there.
+
+With FastAPI running on port 8000, forward the phone's loopback port and add
+the chatbot URL to your existing configured Flutter run command:
+
+```powershell
+adb -s ZD2229TJMM reverse tcp:8000 tcp:8000
+flutter run -d ZD2229TJMM --dart-define-from-file=build/local-model-defines.json --dart-define=API_BASE_URL=http://127.0.0.1:8000 --android-project-arg=kotlin.incremental=false --android-project-arg=kotlin.compiler.execution.strategy=in-process
+```
+
+The defines file above is the existing local public client configuration, generated
+by `tool/run_model_quiz.ps1`; it must never contain the Gemini key. `API_BASE_URL`
+is separate from the existing quiz configuration. Rebuild when changing it.
+Loopback HTTP is permitted by the existing Android debug network configuration.
+Use HTTPS for a hosted backend.
+
+Chat provider calls have a 20-second HTTP timeout and a 25-second total deadline.
+Provider timeouts return HTTP 504; overload returns 503 and rate limits return 429.
+Flutter shows a retry message and keeps the prompt when a request fails.
+
 ## Validate
 
 ```powershell

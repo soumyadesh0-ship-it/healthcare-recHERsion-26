@@ -13,11 +13,13 @@ import '../pcos_quiz/quiz.dart';
 import '../timeline/timeline.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key, this.onWellbeing, this.onQuiz});
+  const HomePage({super.key, this.onWellbeing, this.onQuiz, this.displayName});
   final VoidCallback? onWellbeing, onQuiz;
+  final String? displayName;
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
+    final name = displayName?.trim();
     final entries = session.records.entries;
     final now = session.zone == 'UTC' ? DateTime.now().toUtc() : DateTime.now();
     return ListView(
@@ -38,7 +40,7 @@ class HomePage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Hello, Alex.',
+                      name == null || name.isEmpty ? 'Hello.' : 'Hello, $name.',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 8),
@@ -60,6 +62,13 @@ class HomePage extends StatelessWidget {
           label: const Text('Log entry'),
         ),
         Text('Your spaces', style: Theme.of(context).textTheme.titleLarge),
+        ActionCard(
+          title: 'AI Assistant',
+          color: Palette.lavender,
+          subtitle: 'Ask AuraCare a question',
+          icon: Icons.chat_bubble_outline,
+          onTap: () => Navigator.of(context).pushNamed('/app/assistant'),
+        ),
         ActionCard(
           title: 'Journal',
           color: Palette.periwinkle,

@@ -1,9 +1,11 @@
 """Run from the repository root: uvicorn service.main:app --reload."""
 
+import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -13,8 +15,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google import genai
-from google.genai import types
-from httpx import HTTPError
+from google.genai import errors, types
+from httpx import HTTPError, TimeoutException
 from postgrest.exceptions import APIError
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
 from supabase import ClientOptions, create_client
@@ -22,10 +24,12 @@ from supabase_auth.errors import AuthApiError, AuthRetryableError
 
 from service import pcos_model
 
+load_dotenv(Path(__file__).resolve().parent.parent / '.env.local')
 load_dotenv()
 
 
 METHOD_VERSION = "survey-count-v1"
+CHAT_TIMEOUT_SECONDS = 25
 CHAT_SYSTEM_INSTRUCTION = """
 You are AuraCare, an AI assistant providing helpful, respectful general health
 and wellness information. Clearly identify yourself as an AI assistant, not a
@@ -150,20 +154,42 @@ async def private_responses(request: Request, call_next):
 
 
 @app.post("/chat", response_model=ChatResponse)
-def chat(message: ChatRequest):
+async def chat(message: ChatRequest):
+    key = os.getenv('GEMINI_API_KEY', '').strip()
+    if not key:
+        raise HTTPException(503, 'The assistant is not configured on the backend.')
     try:
-        client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
-        with client:
-            result = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=message.prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=CHAT_SYSTEM_INSTRUCTION,
-                    max_output_tokens=2048,
+        client = genai.Client(
+            api_key=key,
+            http_options=types.HttpOptions(
+                timeout=20000,
+                retry_options=types.HttpRetryOptions(attempts=1),
+            ),
+        )
+        async with client.aio as ai:
+            result = await asyncio.wait_for(
+                ai.models.generate_content(
+                    model="gemini-3.8-flash",
+                    contents=message.prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=CHAT_SYSTEM_INSTRUCTION,
+                        max_output_tokens=2048,
+                    ),
                 ),
+                timeout=CHAT_TIMEOUT_SECONDS,
             )
+    except (TimeoutError, TimeoutException) as e:
+        raise HTTPException(504, 'The AI provider took too long to reply. Please try again.') from e
+    except errors.APIError as e:
+        if e.code == 429:
+            raise HTTPException(429, 'The AI provider is rate limited. Please try again later.') from e
+        if e.code in (500, 502, 503):
+            raise HTTPException(503, 'The AI provider is busy. Please try again shortly.') from e
+        if e.code in (408, 504):
+            raise HTTPException(504, 'The AI provider took too long to reply. Please try again.') from e
+        raise HTTPException(502, 'The AI provider could not answer. Check the backend configuration.') from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(502, 'Could not reach the AI provider. Please try again.') from e
     text = result.text
     if not text or not text.strip():
         raise HTTPException(502, "The AI did not return a text response. Please rephrase your question.")

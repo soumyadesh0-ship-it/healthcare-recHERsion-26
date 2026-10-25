@@ -18,6 +18,7 @@ import '../features/learn/learn.dart';
 import '../features/insights/insights.dart';
 import '../features/onboarding/onboarding.dart';
 import '../features/auth/auth.dart';
+import '../features/assistant/assistant.dart';
 
 class AuracareApp extends StatefulWidget {
   const AuracareApp({
@@ -185,6 +186,7 @@ class _AuracareAppState extends State<AuracareApp> {
                   '/app/profile',
                   '/app/learn',
                   '/app/insights',
+                  '/app/assistant',
                 }.contains(settings.name)) {
               return null;
             }
@@ -225,6 +227,7 @@ class _AuracareAppState extends State<AuracareApp> {
                     },
                   ),
                   '/app/learn' => const LearnPage(),
+                  '/app/assistant' => const AssistantPage(),
                   _ => const InsightsPage(),
                 };
                 return Scaffold(

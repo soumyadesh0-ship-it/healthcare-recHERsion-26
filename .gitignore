@@ -42,6 +42,7 @@
 **/ios/**/xcuserdata/
 
 # Temporary logs, editor swap files and caches
+/.env.local
 **/*.log
 .venv-pcos/
 **/__pycache__/
