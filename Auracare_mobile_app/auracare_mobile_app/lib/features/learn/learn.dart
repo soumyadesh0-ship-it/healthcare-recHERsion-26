@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/session.dart';
 import '../../core/widgets.dart';
+import '../../core/topic_illustration.dart';
 import '../../app/theme.dart';
 import '../../data/services.dart';
 import '../appointments/appointments.dart';
@@ -64,7 +65,7 @@ class _LearnPageState extends State<LearnPage> {
             color: Palette.tiles[resources.indexOf(r) % Palette.tiles.length],
             title: r.topic,
             subtitle: 'Preview · article not available',
-            icon: Icons.menu_book_outlined,
+            leading: TopicIllustration(topic: r.topic),
             onTap: () => pushPage(context, ResourcePage(resource: r)),
           ),
       ]),

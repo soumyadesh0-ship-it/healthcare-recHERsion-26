@@ -1,19 +1,27 @@
 import 'package:flutter/material.dart';
 
 abstract final class Palette {
-  static const purple = Color(0xFF7838C8);
+  static const purple = Color(0xFFB49AD6);
   static const white = Color(0xFFFFFFFF);
-  static const lavender = Color(0xFFC8A8E8);
-  static const pink = Color(0xFFF28AB8);
-  static const blush = Color(0xFFF8CBDF);
-  static const yellow = Color(0xFFFFAE20);
-  static const coral = Color(0xFFF57858);
-  static const turquoise = Color(0xFF27BDB5);
-  static const blue = Color(0xFF7597D3);
-  static const periwinkle = Color(0xFFB7C8E6);
-  static const ink = Color(0xFF111111);
-  static const secondary = Color(0xFF666666);
-  static const input = Color(0xFFF5F5F7);
+  static const lavender = Color(0xFFE8DEF2);
+  static const pink = Color(0xFFEFA8C5);
+  static const blush = Color(0xFFF9DFE9);
+  static const yellow = Color(0xFFF6D794);
+  static const coral = Color(0xFFE99A8B);
+  static const turquoise = Color(0xFF89CECA);
+  static const blue = Color(0xFFA6BCE0);
+  static const periwinkle = blue;
+  static const ink = Color(0xFF34283D);
+  static const flowInk = Color(0xFF24192C);
+  static const secondary = Color(0xFF746A7B);
+  static const input = Color(0xFFFAF8FB);
+  // Dark lavender for small action text and focus outlines on white.
+  static const action = Color(0xFF705488);
+  static const lightFlow = Color(0xFFF8D9E3);
+  static const moderateFlow = Color(0xFFEFA0B9);
+  static const heavyFlow = Color(0xFFD66F91);
+  static const happyMood = Color(0xFFE8BC71);
+  static const tiredMood = Color(0xFFB8A9CF);
   static const plum = ink;
   static const orchid = lavender;
   static const mist = white;
@@ -26,7 +34,7 @@ ThemeData auracareTheme() {
     useMaterial3: true,
     fontFamily: 'Roboto',
     colorScheme: const ColorScheme.light(
-      primary: Palette.purple,
+      primary: Palette.action,
       onPrimary: Palette.white,
       primaryContainer: Palette.lavender,
       onPrimaryContainer: Palette.ink,
@@ -113,7 +121,7 @@ ThemeData auracareTheme() {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: Palette.purple,
-        foregroundColor: Palette.white,
+        foregroundColor: Palette.ink,
         elevation: 0,
         minimumSize: const Size(48, 54),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -141,7 +149,7 @@ ThemeData auracareTheme() {
       border: border,
       enabledBorder: border,
       focusedBorder: border.copyWith(
-        borderSide: const BorderSide(color: Palette.purple, width: 2),
+        borderSide: const BorderSide(color: Palette.action, width: 2),
       ),
     ),
     chipTheme: ChipThemeData(

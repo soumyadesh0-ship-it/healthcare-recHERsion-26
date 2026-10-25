@@ -5,6 +5,7 @@ import '../../core/widgets.dart';
 import '../../core/calendar.dart';
 import '../../data/records.dart';
 import '../logging/editor.dart';
+import '../cycle/cycle.dart';
 
 class TimelineScreen extends StatelessWidget {
   const TimelineScreen({super.key});
@@ -72,6 +73,27 @@ class _TimelinePageState extends State<TimelinePage> {
             selected: range?.start,
             onSelect: (day) =>
                 setState(() => range = DateTimeRange(start: day, end: day)),
+          ),
+        if (widget.onlyType == null)
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => openEditor(
+                  context,
+                  type: EntryType.bleeding,
+                  day: range?.start,
+                ),
+                icon: const Icon(Icons.water_drop_outlined),
+                label: const Text('Log period'),
+              ),
+              TextButton.icon(
+                onPressed: () => pushPage(context, const CyclePage()),
+                icon: const Icon(Icons.calendar_month_outlined),
+                label: const Text('Cycle records'),
+              ),
+            ],
           ),
         FilledButton.icon(
           onPressed: () =>

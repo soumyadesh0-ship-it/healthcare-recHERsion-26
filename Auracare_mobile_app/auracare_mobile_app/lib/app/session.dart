@@ -17,6 +17,12 @@ class DemoSession extends ChangeNotifier {
       processingPreference = false,
       reduceMotion = false;
   String zone = 'Device local';
+  int homeRequest = 0;
+  void requestHome() {
+    homeRequest++;
+    notifyListeners();
+  }
+
   void update(VoidCallback change) {
     change();
     notifyListeners();

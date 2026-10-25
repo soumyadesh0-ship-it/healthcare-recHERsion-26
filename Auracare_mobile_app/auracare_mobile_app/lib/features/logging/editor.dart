@@ -41,6 +41,8 @@ class _EntryEditorState extends State<EntryEditor> {
         (widget.initialMood == null ? '' : 'Feeling: ${widget.initialMood}. '),
   );
   late Severity severity = widget.entry?.severity ?? Severity.unspecified;
+  late RecordedMood? mood =
+      widget.entry?.recordedMood ?? RecordedMood.fromLabel(widget.initialMood);
   DateTime? when;
   String? zone, selection, id;
   bool busy = false, dirty = false, allowPop = false;
@@ -123,6 +125,9 @@ class _EntryEditorState extends State<EntryEditor> {
           note: note.text.trim(),
           severity: severity,
           version: (widget.entry?.version ?? 0) + 1,
+          mood: widget.type == EntryType.wellness && selection == 'Mood'
+              ? mood
+              : null,
         ),
       );
       if (!mounted) return;
@@ -138,7 +143,13 @@ class _EntryEditorState extends State<EntryEditor> {
         busy = false;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.pop(context);
+        if (!mounted) return;
+        if (widget.type == EntryType.wellness && selection == 'Mood') {
+          SessionScope.of(context).requestHome();
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        } else {
+          Navigator.pop(context);
+        }
       });
     } catch (e) {
       if (mounted) {
@@ -259,6 +270,27 @@ class _EntryEditorState extends State<EntryEditor> {
                                 dirty = true;
                               });
                             },
+                    ),
+                  if (widget.type == EntryType.wellness && selection == 'Mood')
+                    DropdownButtonFormField<RecordedMood>(
+                      initialValue: mood,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Feeling (optional)',
+                      ),
+                      items: [
+                        for (final value in RecordedMood.values)
+                          DropdownMenuItem(
+                            value: value,
+                            child: Text(value.label),
+                          ),
+                      ],
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() {
+                              mood = value;
+                              dirty = true;
+                            }),
                     ),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.calendar_month_outlined),

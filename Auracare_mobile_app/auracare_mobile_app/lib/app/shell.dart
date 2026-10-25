@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
+import 'session.dart';
 import '../core/widgets.dart';
 import '../features/home/home.dart';
 import '../features/timeline/timeline.dart';
@@ -16,6 +17,15 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int index = 0;
+  int? lastHomeRequest;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final request = SessionScope.of(context).homeRequest;
+    if (lastHomeRequest != null && lastHomeRequest != request) index = 0;
+    lastHomeRequest = request;
+  }
+
   static const labels = ['Home', 'Timeline', 'Learn', 'Insights', 'Profile'];
   static const icons = [
     Icons.home_outlined,

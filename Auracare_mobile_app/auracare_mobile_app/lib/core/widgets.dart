@@ -197,12 +197,14 @@ class ActionCard extends StatelessWidget {
     super.key,
     required this.title,
     required this.subtitle,
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.onTap,
     this.color = Palette.input,
-  });
+  }) : assert(icon != null || leading != null);
   final String title, subtitle;
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final Color color;
   final VoidCallback onTap;
   @override
@@ -216,7 +218,7 @@ class ActionCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            Icon(icon, size: 28),
+            leading ?? Icon(icon, size: 28),
             const SizedBox(width: 16),
             Expanded(
               child: Column(

@@ -33,6 +33,7 @@ void main() {
       );
       await tester.pumpWidget(const AuracareApp());
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Get started'));
       await tester.tap(find.text('Get started'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Skip'));
@@ -123,24 +124,26 @@ void main() {
         MaterialApp(
           theme: auracareTheme(),
           home: Scaffold(
-            body: RecordCalendar(
-              selected: DateTime(2026, 10, 1),
-              entries: [
-                HealthEntry(
-                  id: 'period',
-                  type: EntryType.bleeding,
-                  title: 'Bleeding',
-                  when: DateTime(2026, 10, 12),
-                  zone: 'Device local',
-                ),
-              ],
-              onSelect: (day) => selected = day,
+            body: SingleChildScrollView(
+              child: RecordCalendar(
+                selected: DateTime(2026, 10, 1),
+                entries: [
+                  HealthEntry(
+                    id: 'period',
+                    type: EntryType.bleeding,
+                    title: 'Bleeding',
+                    when: DateTime(2026, 10, 12),
+                    zone: 'Device local',
+                  ),
+                ],
+                onSelect: (day) => selected = day,
+              ),
             ),
           ),
         ),
       );
       expect(find.text('October 2026'), findsOneWidget);
-      await tester.tap(find.bySemanticsLabel('2026-10-12, bleeding'));
+      await tester.tap(find.bySemanticsLabel(RegExp('2026-10-12, bleeding')));
       expect(selected, DateTime(2026, 10, 12));
       await tester.tap(find.byTooltip('Next month'));
       await tester.pumpAndSettle();

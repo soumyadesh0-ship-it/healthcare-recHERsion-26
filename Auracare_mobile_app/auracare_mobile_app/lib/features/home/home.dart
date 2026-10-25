@@ -6,7 +6,6 @@ import '../../core/widgets.dart';
 import '../../data/records.dart';
 
 import '../logging/editor.dart';
-import '../cycle/cycle.dart';
 import '../journal/journal.dart';
 import '../appointments/appointments.dart';
 import '../pcos_quiz/quiz.dart';
@@ -59,22 +58,6 @@ class HomePage extends StatelessWidget {
           label: const Text('Log entry'),
         ),
         Text('Your spaces', style: Theme.of(context).textTheme.titleLarge),
-        if (session.cycleEnabled)
-          ActionCard(
-            title: 'Cycle records',
-            color: Palette.blush,
-            subtitle: 'Record bleeding days, without predictions',
-            icon: Icons.calendar_month_outlined,
-            onTap: () => pushPage(context, const CyclePage()),
-          )
-        else
-          ActionCard(
-            title: 'Cycle records',
-            color: Palette.blush,
-            subtitle: 'Choose whether to add it to Home',
-            icon: Icons.calendar_month_outlined,
-            onTap: () => pushPage(context, const CyclePage()),
-          ),
         ActionCard(
           title: 'Journal',
           color: Palette.periwinkle,

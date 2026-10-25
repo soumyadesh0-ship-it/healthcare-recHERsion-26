@@ -64,7 +64,7 @@ class _AuracareAppState extends State<AuracareApp> {
     child: ListenableBuilder(
       listenable: session,
       builder: (context, _) => MaterialApp(
-        title: 'Auracare',
+        title: 'AuraCare',
         debugShowCheckedModeBanner: false,
         theme: auracareTheme(),
         builder: (context, child) {

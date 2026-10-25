@@ -33,7 +33,7 @@ class _CyclePageState extends State<CyclePage> {
           contentPadding: EdgeInsets.zero,
           title: const Text('Enable cycle tracking'),
           subtitle: const Text(
-            'Turning off hides the calendar action on Home. Existing records remain in Timeline; delete them separately.',
+            'Enable the selected-day recording tools here. Existing records always remain visible in Timeline.',
           ),
           value: session.cycleEnabled,
           onChanged: (v) => session.update(() => session.cycleEnabled = v),

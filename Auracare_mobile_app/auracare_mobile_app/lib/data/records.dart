@@ -6,6 +6,21 @@ enum EntryType { symptom, journal, bleeding, wellness }
 
 enum Severity { unspecified, mild, moderate, severe }
 
+enum FlowIntensity { unspecified, light, moderate, heavy }
+
+enum RecordedMood {
+  happy,
+  calm,
+  sad,
+  anxious,
+  tired,
+  energetic;
+
+  String get label => '${name[0].toUpperCase()}${name.substring(1)}';
+  static RecordedMood? fromLabel(String? label) =>
+      values.where((mood) => mood.label == label).firstOrNull;
+}
+
 String dayLabel(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 String timeLabel(DateTime d) =>
@@ -24,12 +39,52 @@ class HealthEntry {
     this.note = '',
     this.severity = Severity.unspecified,
     this.version = 1,
+    this.mood,
+    this.savedAt,
   });
   final String id, title, note, zone;
   final EntryType type;
   final DateTime when;
   final Severity severity;
   final int version;
+  final RecordedMood? mood;
+
+  /// Successful save time, separate from the observation's calendar date.
+  final DateTime? savedAt;
+
+  FlowIntensity? get flowIntensity {
+    if (type != EntryType.bleeding) return null;
+    // The original form already saves intensity in these exact titles.
+    return switch (title) {
+      'Bleeding · Light' => FlowIntensity.light,
+      'Bleeding · Moderate' => FlowIntensity.moderate,
+      'Bleeding · Heavy' => FlowIntensity.heavy,
+      _ => FlowIntensity.unspecified,
+    };
+  }
+
+  RecordedMood? get recordedMood {
+    if (type != EntryType.wellness || title != 'Mood') return null;
+    if (mood != null) return mood;
+    // Read the old picker's explicit prefix; never infer mood from free text.
+    final match = RegExp(
+      r'^Feeling: (Happy|Calm|Sad|Anxious|Tired|Energetic)\.(?:\s|$)',
+    ).firstMatch(note);
+    return RecordedMood.fromLabel(match?.group(1));
+  }
+
+  HealthEntry savedOn(DateTime timestamp) => HealthEntry(
+    id: id,
+    type: type,
+    title: title,
+    when: when,
+    zone: zone,
+    note: note,
+    severity: severity,
+    version: version,
+    mood: mood,
+    savedAt: timestamp,
+  );
   Map<String, Object?> toJson() => {
     'id': id,
     'type': type.name,
@@ -39,6 +94,8 @@ class HealthEntry {
     'note': note,
     'severity': severity.name,
     'version': version,
+    if (mood != null) 'mood': mood!.name,
+    if (savedAt != null) 'savedAt': savedAt!.toIso8601String(),
   };
   String get description =>
       '${dayLabel(when)} ${timeLabel(when)} · $zone\n$title · ${type.name}'
@@ -49,6 +106,23 @@ abstract class RecordsRepository extends ChangeNotifier {
   List<HealthEntry> get entries;
   Future<void> save(HealthEntry entry);
   Future<void> delete(String id);
+}
+
+/// Keeps all records; only the calendar's summary chooses one value per type.
+class RecordedDay {
+  RecordedDay(Iterable<HealthEntry> records, DateTime day)
+    : entries = records.where((e) => dayLabel(e.when) == dayLabel(day)).toList()
+        ..sort((a, b) {
+          if (a.savedAt != null && b.savedAt == null) return -1;
+          if (b.savedAt != null && a.savedAt == null) return 1;
+          final order = (b.savedAt ?? b.when).compareTo(a.savedAt ?? a.when);
+          return order != 0 ? order : b.id.compareTo(a.id);
+        });
+  final List<HealthEntry> entries;
+  HealthEntry? get period =>
+      entries.where((e) => e.type == EntryType.bleeding).firstOrNull;
+  HealthEntry? get moodEntry =>
+      entries.where((e) => e.recordedMood != null).firstOrNull;
 }
 
 class DemoRecordsRepository extends RecordsRepository {
@@ -84,9 +158,9 @@ class DemoRecordsRepository extends RecordsRepository {
       if (entry.version != _entries[index].version + 1) {
         throw StateError('This entry changed. Reopen it before editing.');
       }
-      _entries[index] = entry;
+      _entries[index] = entry.savedOn(DateTime.now().toUtc());
     } else {
-      _entries.add(entry);
+      _entries.add(entry.savedOn(DateTime.now().toUtc()));
     }
     notifyListeners();
   }

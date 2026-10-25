@@ -1,5 +1,7 @@
 # Auracare mobile demo
 
+Current UI refinements, logo assets, changed files and device/test results: [AuraCare refinement](../../docs/AURACARE_REFINEMENT.md).
+
 Flutter/Dart mobile UI with a shared in-memory synthetic session. No real account, secure persistence, health uploads, model, AI service, community or provider integration is connected. Do not enter real health information. Android remembers first-run onboarding completion using a native SharedPreferences flag. Health records and other session preferences remain in memory; restarting starts with empty records. Samples are loaded only through an explicit demo action. No sensitive-text storage package is used.
 
 Implemented: original flat geometric characters, white/pastel UI, welcome screen, three onboarding pages, sample/empty entry, Home/Timeline/Learn/Insights/Profile tabs, symptom/wellbeing/journal/bleeding record CRUD, date/type filters, optional cycle day selection, source-linked descriptive coverage, selected appointment preparation and clipboard summary, question management, synthetic JSON export/reset, and experimental PCOS quiz with fixture/failure/unavailable states. Learn topics are structural previews without invented articles or review credentials.

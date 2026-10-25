@@ -4,6 +4,7 @@ import '../../app/session.dart';
 import '../../app/theme.dart';
 import '../../core/widgets.dart';
 import '../../core/characters.dart';
+import '../../core/brand.dart';
 
 class Onboarding extends StatefulWidget {
   const Onboarding({super.key, required this.onEnter});
@@ -57,10 +58,7 @@ class _OnboardingState extends State<Onboarding> {
                   Flexible(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text(
-                        'auracare',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+                      child: const AuraLogo(width: 132, wordmarkOnly: true),
                     ),
                   ),
                   const Spacer(),
@@ -228,16 +226,12 @@ class WelcomeSplash extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 48),
-                      Text(
-                        'auracare',
-                        style: Theme.of(context).textTheme.headlineLarge!
-                            .copyWith(fontSize: 48, letterSpacing: -2),
-                      ),
+                      const Center(child: AuraLogo(width: 230)),
                       const SizedBox(height: 16),
                       const Text('A kinder way to understand your body.'),
                     ],
                   ),
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 40),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
