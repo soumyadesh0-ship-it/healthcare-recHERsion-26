@@ -7,8 +7,9 @@ import '../../core/characters.dart';
 import '../../core/brand.dart';
 
 class Onboarding extends StatefulWidget {
-  const Onboarding({super.key, required this.onEnter});
+  const Onboarding({super.key, required this.onEnter, this.demoEntry = false});
   final ValueChanged<bool> onEnter;
+  final bool demoEntry;
   @override
   State<Onboarding> createState() => _OnboardingState();
 }
@@ -104,11 +105,11 @@ class _OnboardingState extends State<Onboarding> {
                           ),
                         ),
                         const Text(
-                          'Account connection coming later',
+                          'AuraCare account sign-in',
                           style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                         const Text(
-                          'Service purpose: display and edit a synthetic session. No account, remote storage or legal consent system is connected.',
+                          'Your account is used for sign-in only. Health records remain in this local session and are not uploaded or synced.',
                         ),
                         DropdownButtonFormField<String>(
                           itemHeight: null,
@@ -137,13 +138,18 @@ class _OnboardingState extends State<Onboarding> {
                               session.update(() => session.cycleEnabled = v),
                         ),
                         FilledButton(
-                          onPressed: () => widget.onEnter(true),
-                          child: const Text('Explore demo'),
-                        ),
-                        OutlinedButton(
                           onPressed: () => widget.onEnter(false),
-                          child: const Text('Start empty demo'),
+                          child: Text(
+                            widget.demoEntry
+                                ? 'Start empty demo'
+                                : 'Continue to login',
+                          ),
                         ),
+                        if (widget.demoEntry)
+                          OutlinedButton(
+                            onPressed: () => widget.onEnter(true),
+                            child: const Text('Explore demo'),
+                          ),
                       ],
                     ]),
                   ),

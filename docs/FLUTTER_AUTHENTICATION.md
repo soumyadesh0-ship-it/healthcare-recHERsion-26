@@ -6,6 +6,24 @@ recovery, local sign-out, SDK persisted session restoration and automatic refres
 are implemented. Missing/invalid configuration leaves account actions disabled;
 the explicitly labelled synthetic demo remains available.
 
+After reconciling the shared login work from `main`, production startup still
+uses `AuthenticationRoot` and `AuraAuthController`. `ControllerAuthService`
+adapts that controller to the shared `LoginPage`, registration and recovery
+widgets. This retains current-token injection, recovery sign-out, demo isolation
+and authenticated PCOS service selection without initializing another SDK client.
+Registration forwards display-name metadata. The shell displays account identity
+and supports profile sign-out. `AuracareApp(authService: ...)` remains available
+for the existing standalone entry flow; the production root passes externally
+managed account state and sign-out instead of running a second login flow.
+Both controller tests and upstream widget tests are retained in separate files.
+
+Merge reconciliation validation on 2026-10-25: `flutter pub get` succeeded;
+`flutter analyze` reported no issues (7.6 seconds); the focused auth/Supabase/PCOS/API
+run passed 129 tests; the complete Flutter suite passed 219 tests with zero
+failures (3 minutes). This includes the shared login screen driving the API
+controller and entering a PCOS-enabled account session. These are mocked tests,
+not verification of live Supabase, email delivery, device links or RLS.
+
 ## Run and dashboard configuration
 
 From `Auracare_mobile_app/auracare_mobile_app`:
@@ -25,6 +43,11 @@ configure the password policy and email delivery/SMTP, and add this exact allowe
 redirect URL under URL Configuration:
 
 `org.auracare.auracare_mobile_app://auth/callback`
+
+The merged Android/iOS manifests and production SDK handler also accept the
+upstream `auracare://auth-callback` URL for existing links. Allow that URL in the
+dashboard too if links were issued using the upstream flow. New production
+requests continue using the first URL. These routes still require device testing.
 
 Keep email templates compatible with Supabase's verification redirect flow. The
 Android manifest registers this callback; Flutter's built-in deep-link navigation

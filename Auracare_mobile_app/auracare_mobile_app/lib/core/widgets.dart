@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/theme.dart';
+import '../app/session.dart';
 import '../data/records.dart';
 
 void tell(BuildContext context, String text) =>
@@ -59,7 +60,13 @@ void pushPage(BuildContext context, Widget child) {
 }
 
 class DemoBadge extends StatelessWidget {
-  const DemoBadge({super.key});
+  const DemoBadge({super.key, this.isAuthenticated = false});
+  final bool isAuthenticated;
+
+  String get label => isAuthenticated
+      ? 'Account signed in · records are session-only'
+      : 'Demo — sample data';
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -76,7 +83,14 @@ class DemoBadge extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Demo — sample data',
+            context
+                        .dependOnInheritedWidgetOfExactType<SessionScope>()
+                        ?.notifier
+                        ?.records
+                        .isRemote ==
+                    true
+                ? 'Cloud records are deployment-gated · status shown above'
+                : label,
             style: Theme.of(context).textTheme.bodyMedium!
                 .copyWith(fontSize: 14),
           ),
@@ -86,10 +100,20 @@ class DemoBadge extends StatelessWidget {
   );
 }
 
-double demoBadgeHeight(BuildContext context) {
+double demoBadgeHeight(BuildContext context, {bool isAuthenticated = false}) {
   final painter = TextPainter(
     text: TextSpan(
-      text: 'Demo — sample data',
+      text:
+          context
+                  .dependOnInheritedWidgetOfExactType<SessionScope>()
+                  ?.notifier
+                  ?.records
+                  .isRemote ==
+              true
+          ? 'Cloud records are deployment-gated · status shown above'
+          : isAuthenticated
+          ? 'Account signed in · records are session-only'
+          : 'Demo — sample data',
       style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontSize: 14),
     ),
     textDirection: Directionality.of(context),
@@ -261,7 +285,7 @@ class EntryCard extends StatelessWidget {
   Widget build(BuildContext context) => ActionCard(
     title: entry.title,
     subtitle:
-        '${timeLabel(entry.when)} · ${entry.type.name}\n${entry.zone}${entry.tracking == null ? '' : '\n${entry.tracking!.summary}'}',
+        '${entry.observationTimeKnown ? timeLabel(entry.when) : 'Time not recorded'} · ${entry.type.name}\n${entry.zone}${entry.tracking == null ? '' : '\n${entry.tracking!.summary}'}',
     icon: entryIcon(entry.type),
     onTap: onTap,
   );

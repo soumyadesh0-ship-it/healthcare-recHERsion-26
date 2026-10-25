@@ -191,7 +191,7 @@ String appointmentSummary(
   final facts = selected
       .map(
         (e) =>
-            '${dayLabel(e.when)} ${timeLabel(e.when)} (${e.zone}) — ${e.title} [${e.type.name}, v${e.version}]'
+            '${dayLabel(e.when)} ${e.observationTimeKnown ? timeLabel(e.when) : 'Time not recorded'} (${e.zone}) — ${e.title} [${e.type.name}, v${e.version}]'
             '${e.tracking == null ? '' : '\n${e.tracking!.summary}'}'
             '${includeNotes && e.note.isNotEmpty ? '\n${e.note}' : ''}',
       )

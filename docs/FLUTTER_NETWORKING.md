@@ -1,10 +1,13 @@
 # Flutter networking infrastructure
 
-The Flutter API client is opt-in infrastructure in
-`Auracare_mobile_app/auracare_mobile_app/lib/data/api_client.dart`. The authenticated
-PCOS questionnaire now uses it only after explicit review and confirmation; see
-[PCOS integration](FLUTTER_PCOS_INTEGRATION.md). Demo repositories, other health
-records and chat remain disconnected.
+The Flutter API client is used by the authenticated PCOS questionnaire and
+authenticated AI chat in
+`Auracare_mobile_app/auracare_mobile_app/lib/data/api_client.dart`. The quiz
+requires explicit review and confirmation; every chat message separately
+requires explicit AI-processing confirmation. Health records use a separate
+authenticated repository behind a deployment gate that is off by default; see
+[PCOS integration](FLUTTER_PCOS_INTEGRATION.md) and the mobile README's
+migration warning. Demo repositories remain local and session-only.
 Account entry, Supabase initialization and session persistence are now implemented; see [authentication setup](FLUTTER_AUTHENTICATION.md).
 
 ## Configuration and ownership
@@ -12,8 +15,8 @@ Account entry, Supabase initialization and session persistence are now implement
 Construct `ApiConfig.fromEnvironment()` to read
 `--dart-define=AURACARE_API_BASE_URL=...`. There is no fallback URL: missing or
 invalid configuration fails closed when the client is explicitly constructed.
-The existing app still starts normally without a define because it does not
-instantiate the client. URLs may include a reverse-proxy path prefix.
+The app can still launch without a define, but authenticated API requests will
+show a safe configuration error. URLs may include a reverse-proxy path prefix.
 
 Inject an `AccessTokenProvider` whose `accessToken()` returns the current Supabase
 **user access token** or null. The client asks afresh for every authenticated
@@ -42,6 +45,11 @@ Do not add request/body logging in future adapters or interceptors.
   paths appear in the public schema; false means a different contract. Failure
   throws a safe `ApiException`. This does not test Supabase, Gemini, auth or RLS.
   No new backend endpoint was needed.
+
+The Home screen's AI Assistant opens chat for signed-in users. Demo mode labels
+chat unavailable and sends no prompt. Each authenticated message is submitted
+alone; neither records nor prior chat messages are sent as context. Responses
+are general information, not diagnosis or treatment.
 
 Default timeout is 45 seconds for the entire operation, including token lookup,
 connection and response reading; it is injectable for tests. Timeout triggers
@@ -125,4 +133,3 @@ References: [Flutter HTTP networking](https://docs.flutter.dev/cookbook/networki
 [HTTP package and abortable requests](https://pub.dev/packages/http),
 [Android emulator addresses](https://developer.android.com/studio/run/emulator-networking-address),
 [Android network security configuration](https://developer.android.com/privacy-and-security/security-config).
-

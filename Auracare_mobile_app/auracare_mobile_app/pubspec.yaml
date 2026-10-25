@@ -1,5 +1,5 @@
 name: auracare_mobile_app
-description: "Auracare synthetic mobile UI prototype. Session-only records; no connected backend."
+description: "AuraCare Flutter app with Supabase authentication and session-only health records."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.5.0
+  http: ^1.6.0
   supabase_flutter: ^2.18.3
 
 dev_dependencies:

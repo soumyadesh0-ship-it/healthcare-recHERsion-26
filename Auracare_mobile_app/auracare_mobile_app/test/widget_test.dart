@@ -89,7 +89,10 @@ void main() {
     await tester.pumpAndSettle();
     await tapText(tester, 'Back');
     await tapText(tester, 'Skip');
-    await tapText(tester, 'Start empty demo');
+    await tapText(tester, 'Continue to login');
+    expect(find.text('Welcome to AuraCare'), findsOneWidget);
+    await tapText(tester, 'Continue in demo mode');
+    await tapText(tester, 'Start empty');
     expect(find.text('Demo — sample data'), findsOneWidget);
     for (final tab in [
       'Timeline',
@@ -202,7 +205,10 @@ void main() {
       expect(clipboard, contains('Headache'));
       expect(clipboard, isNot(contains('Fictional sample: noticed')));
       final id = session.records.entries.first.id;
-      await tester.runAsync(() => session.records.delete(id));
+      final version = session.records.entries.first.version;
+      await tester.runAsync(
+        () => session.records.delete(id, expectedVersion: version),
+      );
       await tester.pumpAndSettle();
       await tapText(tester, 'Copy synthetic summary');
       expect(clipboard, contains('No records selected.'));
@@ -286,7 +292,9 @@ void main() {
       tester,
       'Fatigue recorded on 1 of 1 days with entries. Days without entries are unknown.',
     );
-    await tester.runAsync(() => session.records.delete(entry.id));
+    await tester.runAsync(
+      () => session.records.delete(entry.id, expectedVersion: 2),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('tab-Timeline')));
     await tester.pumpAndSettle();
@@ -397,7 +405,9 @@ void main() {
         'Doctor',
         'Profile',
       ]) {
-        await tester.tap(find.byKey(ValueKey('tab-$tab')));
+        final destination = find.byKey(ValueKey('tab-$tab'));
+        await tester.ensureVisible(destination);
+        await tester.tap(destination);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'Active tab: $tab');
       }

@@ -11,12 +11,14 @@ class LoginPage extends StatefulWidget {
     required this.onAuthenticated,
     required this.onDemoSelected,
     this.initialMessage,
+    this.onResendVerification,
   });
 
   final AuthService auth;
   final ValueChanged<AuthUser> onAuthenticated;
   final ValueChanged<bool> onDemoSelected;
   final String? initialMessage;
+  final Future<void> Function(String email)? onResendVerification;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -130,6 +132,40 @@ class _LoginPageState extends State<LoginPage> {
         style: TextStyle(color: Palette.secondary),
       ),
       const SizedBox(height: 28),
+      if (widget.onResendVerification != null)
+        TextButton(
+          onPressed: busy
+              ? null
+              : () async {
+                  final value = email.text.trim();
+                  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)) {
+                    setState(() => error = 'Enter a valid email address.');
+                    return;
+                  }
+                  setState(() {
+                    busy = true;
+                    error = null;
+                  });
+                  try {
+                    await widget.onResendVerification!(value);
+                    if (mounted) {
+                      setState(
+                        () => error =
+                            'If eligible, a verification email has been sent.',
+                      );
+                    }
+                  } on AuthException catch (exception) {
+                    if (mounted) {
+                      setState(
+                        () => error = authFailureMessage(exception.failure),
+                      );
+                    }
+                  } finally {
+                    if (mounted) setState(() => busy = false);
+                  }
+                },
+          child: const Text('Resend verification email'),
+        ),
       Form(
         key: formKey,
         child: Column(

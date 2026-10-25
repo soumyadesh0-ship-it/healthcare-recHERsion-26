@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
+import 'dart:async';
+
+import 'auth_service.dart';
 import 'session.dart';
 import 'setup_preference.dart';
 import '../data/records.dart';
@@ -8,6 +11,7 @@ import 'theme.dart';
 import 'shell.dart';
 import 'navigation.dart';
 import '../features/onboarding/onboarding.dart';
+import '../features/auth/auth.dart';
 
 class AuracareApp extends StatefulWidget {
   const AuracareApp({
@@ -15,9 +19,15 @@ class AuracareApp extends StatefulWidget {
     this.session,
     this.showOnboarding = true,
     this.accessWrapper,
+    this.authService,
+    this.externalAuthUser,
+    this.externalSignOut,
   });
   final Widget Function(BuildContext context, Widget child)? accessWrapper;
+  final AuthUser? externalAuthUser;
+  final Future<void> Function()? externalSignOut;
   final DemoSession? session;
+  final AuthService? authService;
   final bool showOnboarding;
   @override
   State<AuracareApp> createState() => _AuracareAppState();
@@ -25,10 +35,20 @@ class AuracareApp extends StatefulWidget {
 
 class _AuracareAppState extends State<AuracareApp> {
   String? lastLayoutMetrics;
+  late final AuthService auth =
+      widget.authService ?? const UnconfiguredAuthService();
+  StreamSubscription<AuthUser?>? authSubscription;
+  StreamSubscription<void>? passwordRecoverySubscription;
+  AuthUser? authenticatedUser;
+  int authEventVersion = 0;
+  int _navigationEpoch = 0;
+  bool completingPasswordRecovery = false;
+  String? sessionRestoreMessage;
   late final DemoSession session =
       widget.session ??
       DemoSession(records: DemoRecordsRepository(sample: false));
   late bool entered = !widget.showOnboarding;
+  late bool demoMode = !widget.showOnboarding;
   bool loading = true;
   late bool splash = widget.showOnboarding;
   bool previewOnboarding =
@@ -38,11 +58,25 @@ class _AuracareAppState extends State<AuracareApp> {
   void initState() {
     super.initState();
     loadSetup();
+    authSubscription = auth.sessionChanges.listen(updateAuthUser);
+    passwordRecoverySubscription = auth.passwordRecoveryEvents.listen(
+      (_) => beginPasswordRecovery(),
+    );
   }
 
   Future<void> loadSetup() async {
+    final startingVersion = authEventVersion;
     final done = widget.showOnboarding ? await preference.completed() : true;
+    AuthUser? user;
+    try {
+      user = await auth.restoreSession();
+    } on AuthException {
+      if (mounted && startingVersion == authEventVersion) {
+        sessionRestoreMessage = 'Could not restore the saved sign-in session. Please sign in again.';
+      }
+    }
     if (mounted) {
+      if (startingVersion == authEventVersion) updateAuthUser(user);
       setState(() {
         entered = done;
         loading = false;
@@ -50,13 +84,63 @@ class _AuracareAppState extends State<AuracareApp> {
     }
   }
 
+  void _clearSessionBoundary() {
+    // reset invalidates pending local writes; a new Navigator disposes old editors.
+    session.reset();
+    _navigationEpoch++;
+  }
+
+  void updateAuthUser(AuthUser? user) {
+    if (!mounted) return;
+    authEventVersion++;
+    if (authenticatedUser?.id != user?.id || (user != null && demoMode)) {
+      _clearSessionBoundary();
+    }
+    setState(() {
+      authenticatedUser = user;
+      completingPasswordRecovery = false;
+      if (user != null) demoMode = false;
+    });
+  }
+
+  Future<void> beginPasswordRecovery() async {
+    final version = ++authEventVersion;
+    _clearSessionBoundary();
+    setState(() {
+      authenticatedUser = null;
+      demoMode = false;
+      completingPasswordRecovery = false;
+    });
+    try {
+      final user = await auth.restoreSession();
+      if (!mounted || version != authEventVersion) return;
+      setState(() {
+        authenticatedUser = user;
+        completingPasswordRecovery = user != null;
+        demoMode = false;
+      });
+    } on AuthException {
+      if (!mounted || version != authEventVersion) return;
+      setState(() {
+        sessionRestoreMessage = 'The password reset link could not be verified. Request a new link and try again.';
+        completingPasswordRecovery = false;
+        authenticatedUser = null;
+      });
+    }
+  }
+
   Future<void> enter(bool sample) async {
     final saved = await preference.complete();
     if (!mounted) return;
-    if (sample && session.records.entries.isEmpty) {
+    if (widget.accessWrapper != null &&
+        sample &&
+        session.records.entries.isEmpty) {
       session.records.reset(sample: true);
     }
-    setState(() => entered = true);
+    setState(() {
+      entered = true;
+      demoMode = widget.accessWrapper != null;
+    });
     if (!saved) {
       // Unsupported platforms still allow entry; Android persists the flag.
       debugPrint(
@@ -65,8 +149,33 @@ class _AuracareAppState extends State<AuracareApp> {
     }
   }
 
+  void enterDemo(bool sample) {
+    authEventVersion++;
+    _clearSessionBoundary();
+    if (sample) session.records.reset(sample: true);
+    setState(() {
+      authenticatedUser = null;
+      completingPasswordRecovery = false;
+      demoMode = true;
+    });
+  }
+
+  Future<void> signOut() async {
+    authEventVersion++;
+    _clearSessionBoundary();
+    setState(() {
+      authenticatedUser = null;
+      demoMode = false;
+      completingPasswordRecovery = false;
+    });
+    // Clear immediately even if SDK sign-out fails or completes after another login.
+    await auth.signOut();
+  }
+
   @override
   void dispose() {
+    authSubscription?.cancel();
+    passwordRecoverySubscription?.cancel();
     if (widget.session == null) session.dispose();
     super.dispose();
   }
@@ -77,6 +186,7 @@ class _AuracareAppState extends State<AuracareApp> {
     child: ListenableBuilder(
       listenable: session,
       builder: (context, _) => MaterialApp(
+        key: ValueKey(_navigationEpoch),
         title: 'AuraCare',
         debugShowCheckedModeBanner: false,
         theme: auracareTheme(),
@@ -130,9 +240,26 @@ class _AuracareAppState extends State<AuracareApp> {
                   if (!loading) setState(() => splash = false);
                 },
               )
-            : entered
-            ? const AppShell()
-            : Onboarding(onEnter: enter),
+            : !entered
+            ? Onboarding(
+                onEnter: enter,
+                demoEntry: widget.accessWrapper != null,
+              )
+            : widget.accessWrapper != null
+            ? AppShell(
+                authUser: widget.externalAuthUser,
+                onSignOut: widget.externalSignOut,
+              )
+            : completingPasswordRecovery
+            ? UpdatePasswordPage(auth: auth, onPasswordUpdated: updateAuthUser)
+            : authenticatedUser != null || demoMode
+            ? AppShell(authUser: authenticatedUser, onSignOut: signOut)
+            : LoginPage(
+                auth: auth,
+                onAuthenticated: updateAuthUser,
+                onDemoSelected: enterDemo,
+                initialMessage: sessionRestoreMessage,
+              ),
       ),
     ),
   );

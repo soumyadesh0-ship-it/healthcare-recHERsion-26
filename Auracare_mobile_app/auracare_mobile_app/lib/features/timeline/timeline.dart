@@ -185,9 +185,17 @@ class _TimelinePageState extends State<TimelinePage> {
           ),
         if (entries.isEmpty)
           EmptyNotice(
-            all.isEmpty ? 'No records yet' : 'No matching records',
-            all.isEmpty
-                ? 'Start with a fictional observation when you are ready.'
+            !session.records.loaded
+                ? 'Records are not loaded'
+                : all.isEmpty
+                ? 'No records yet'
+                : 'No matching records',
+            !session.records.loaded
+                ? 'Use the account status above to retry loading your records.'
+                : all.isEmpty
+                ? session.records.isRemote
+                      ? 'Add a record when you are ready.'
+                      : 'Start with a fictional observation when you are ready.'
                 : 'Try another record type or clear the date range.',
           ),
         for (final group in groups.entries) ...[

@@ -3,19 +3,22 @@ import 'package:flutter/material.dart';
 import '../data/records.dart';
 import '../data/services.dart';
 import '../data/appointments.dart';
+import '../data/chat_service.dart';
 
 class DemoSession extends ChangeNotifier {
   DemoSession({
-    DemoRecordsRepository? records,
+    RecordsRepository? records,
     AppointmentsRepository? appointments,
     this.quizService,
+    this.chatService,
   }) : records = records ?? DemoRecordsRepository(),
        appointments = appointments ?? AppointmentsRepository() {
     this.records.addListener(notifyListeners);
     this.appointments.addListener(notifyListeners);
   }
-  final DemoRecordsRepository records;
+  final RecordsRepository records;
   final AuthenticatedQuizService? quizService;
+  final AuthenticatedChatService? chatService;
   final AppointmentsRepository appointments;
   bool showCycleEstimates = false, unsuitableCycleEstimates = false;
   final ResourcesRepository resources = PreviewResourcesRepository();
@@ -55,6 +58,7 @@ class DemoSession extends ChangeNotifier {
   @override
   void dispose() {
     quizService?.dispose();
+    chatService?.dispose();
     records.removeListener(notifyListeners);
     records.dispose();
     appointments.removeListener(notifyListeners);

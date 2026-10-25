@@ -5,7 +5,7 @@
 	<key>FlutterDeepLinkingEnabled</key>
 	<false/>
 	<key>CFBundleURLTypes</key>
-	<array><dict><key>CFBundleURLSchemes</key><array><string>org.auracare.auracare_mobile_app</string></array></dict></array>
+	<array><dict><key>CFBundleURLSchemes</key><array><string>org.auracare.auracare_mobile_app</string><string>auracare</string></array></dict></array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

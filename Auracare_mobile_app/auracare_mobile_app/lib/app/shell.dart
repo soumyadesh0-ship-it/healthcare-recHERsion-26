@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'auth_service.dart';
 import 'theme.dart';
 import 'session.dart';
 import '../core/widgets.dart';
+import '../core/brand.dart';
 import '../features/home/home.dart';
 import '../features/timeline/timeline.dart';
 import '../features/learn/learn.dart';
@@ -11,7 +13,9 @@ import '../features/profile/profile.dart';
 import '../features/appointments/doctor.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, this.onSignOut, this.authUser});
+  final Future<void> Function()? onSignOut;
+  final AuthUser? authUser;
   @override
   State<AppShell> createState() => _AppShellState();
 }
@@ -65,16 +69,24 @@ class _AppShellState extends State<AppShell> {
     final content = Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
-        child: IndexedStack(index: index, children: pages),
+        child: IndexedStack(
+          index: index,
+          children: [
+            ...pages.take(5),
+            ProfilePage(authUser: widget.authUser, onSignOut: widget.onSignOut),
+          ],
+        ),
       ),
     );
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(index == 0 ? 'auracare' : labels[index]),
+        title: index == 0 ? const AuraCareBrandHeader() : Text(labels[index]),
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(demoBadgeHeight(context)),
-          child: DemoBadge(),
+          preferredSize: Size.fromHeight(
+            demoBadgeHeight(context, isAuthenticated: widget.authUser != null),
+          ),
+          child: DemoBadge(isAuthenticated: widget.authUser != null),
         ),
       ),
       body: SafeArea(
@@ -94,17 +106,20 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  Widget _tabletNavigation() => NavigationRail(
-    selectedIndex: index,
-    onDestinationSelected: select,
-    labelType: NavigationRailLabelType.all,
-    indicatorColor: Palette.blush,
-    destinations: List.generate(
-      labels.length,
-      (i) => NavigationRailDestination(
-        icon: Icon(icons[i], key: ValueKey('tab-${labels[i]}')),
-        selectedIcon: Icon(icons[i], key: ValueKey('tab-${labels[i]}')),
-        label: Text(labels[i]),
+  Widget _tabletNavigation() => LayoutBuilder(
+    builder: (context, constraints) => NavigationRail(
+      scrollable: constraints.maxHeight < 400,
+      selectedIndex: index,
+      onDestinationSelected: select,
+      labelType: NavigationRailLabelType.all,
+      indicatorColor: Palette.blush,
+      destinations: List.generate(
+        labels.length,
+        (i) => NavigationRailDestination(
+          icon: Icon(icons[i], key: ValueKey('tab-${labels[i]}')),
+          selectedIcon: Icon(icons[i], key: ValueKey('tab-${labels[i]}')),
+          label: Text(labels[i]),
+        ),
       ),
     ),
   );

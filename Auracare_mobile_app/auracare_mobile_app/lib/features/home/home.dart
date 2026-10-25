@@ -10,6 +10,7 @@ import '../journal/journal.dart';
 import '../appointments/appointments.dart';
 import '../pcos_quiz/quiz.dart';
 import '../timeline/timeline.dart';
+import '../chat/chat.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -110,15 +111,11 @@ class HomePage extends StatelessWidget {
         ),
         ActionCard(
           title: 'AI Assistant',
-          subtitle: 'Information and reports — not connected',
+          subtitle: session.chatService == null
+              ? 'Not available in demo mode'
+              : 'General information — consent required for every message',
           icon: Icons.chat_bubble_outline,
-          onTap: () => pushPage(
-            context,
-            const UnavailablePage(
-              'AI Assistant',
-              'No AI or report-processing service is connected. No uploads or health records are sent. Use Learn previews or prepare your own questions.',
-            ),
-          ),
+          onTap: () => pushPage(context, const ChatPage()),
         ),
         ActionCard(
           title: 'Sisterhood',

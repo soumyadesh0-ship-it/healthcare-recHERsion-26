@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:auracare_mobile_app/app/auth_root.dart';
 import 'package:auracare_mobile_app/app/session.dart';
+import 'package:auracare_mobile_app/app/controller_auth_service.dart';
 import 'package:auracare_mobile_app/data/api_client.dart';
 import 'package:auracare_mobile_app/data/auth_service.dart';
 import 'package:auracare_mobile_app/features/auth/auth_page.dart';
@@ -39,7 +40,11 @@ class FakeAuth implements AuthGateway {
   }
 
   @override
-  Future<UserSession?> signUp(String email, String password) async {
+  Future<UserSession?> signUp(
+    String email,
+    String password, {
+    String? fullName,
+  }) async {
     signups++;
     if (failure != null) throw failure!;
     if (signupSession != null) session = signupSession;
@@ -94,6 +99,59 @@ void main() {
     await auth.signIn('synthetic@example.com', 'password');
     expect(auth.mode, AccessMode.authenticated);
     expect(await auth.accessToken(), 'synthetic-token');
+  });
+  test(
+    'merged auth facade uses the API controller and requires verification',
+    () async {
+      final facade = ControllerAuthService(auth);
+      final registration = await facade.createAccount(
+        fullName: 'Synthetic Person',
+        email: 'synthetic@example.com',
+        password: 'password',
+      );
+      expect(registration.emailVerificationRequired, isTrue);
+      expect(await auth.accessToken(), isNull);
+      await facade.signInWithPassword(
+        email: 'synthetic@example.com',
+        password: 'password',
+      );
+      expect(await auth.accessToken(), 'synthetic-token');
+      expect(facade.supportsGoogleSignIn, isFalse);
+      await facade.signOut();
+      expect(await auth.accessToken(), isNull);
+    },
+  );
+  testWidgets('merged login screen enters canonical account session', (
+    tester,
+  ) async {
+    await tester.pumpWidget(AuthenticationRoot(auth: auth));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('login-email')),
+      'synthetic@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('login-password')),
+      'password',
+    );
+    await tester.ensureVisible(find.text('Log in'));
+    await tester.tap(find.text('Log in'));
+    await tester.pumpAndSettle();
+    expect(auth.mode, AccessMode.authenticated);
+    expect(await auth.accessToken(), 'synthetic-token');
+    expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
+    expect(
+      tester
+          .widget<SessionScope>(find.byType(SessionScope))
+          .notifier!
+          .quizService,
+      isNotNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('auth-exit')));
+    await tester.pumpAndSettle();
+    expect(auth.mode, AccessMode.signedOut);
+    expect(find.byKey(const ValueKey('login-email')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
   });
   test('signup confirmation never reuses an unrelated SDK session', () async {
     gateway.session = syntheticSession();

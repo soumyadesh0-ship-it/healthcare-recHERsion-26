@@ -84,10 +84,13 @@ class UserSession {
     required this.token,
     required this.expiresAt,
     required this.emailVerified,
+    this.email,
+    this.displayName,
   });
   final String userId, token;
   final DateTime expiresAt;
   final bool emailVerified;
+  final String? email, displayName;
   @override
   String toString() => 'UserSession';
 }
@@ -104,7 +107,11 @@ abstract interface class AuthGateway {
   UserSession? get session;
   Stream<AuthUpdate> get changes;
   Future<void> signIn(String email, String password);
-  Future<UserSession?> signUp(String email, String password);
+  Future<UserSession?> signUp(
+    String email,
+    String password, {
+    String? fullName,
+  });
   Future<void> resendVerification(String email);
   Future<void> requestPasswordReset(String email);
   Future<void> updatePassword(String password);
@@ -126,6 +133,10 @@ class SupabaseAuthGateway implements AuthGateway {
             isUtc: true,
           ),
           emailVerified: value.user.emailConfirmedAt != null,
+          email: value.user.email,
+          displayName: value.user.userMetadata?['display_name'] is String
+              ? value.user.userMetadata!['display_name'] as String
+              : null,
         );
 
   @override
@@ -163,11 +174,16 @@ class SupabaseAuthGateway implements AuthGateway {
     await client.auth.signInWithPassword(email: email, password: password);
   });
   @override
-  Future<UserSession?> signUp(String email, String password) => _safe(() async {
+  Future<UserSession?> signUp(
+    String email,
+    String password, {
+    String? fullName,
+  }) => _safe(() async {
     final result = await client.auth.signUp(
       email: email,
       password: password,
       emailRedirectTo: authCallbackUrl,
+      data: fullName == null ? null : {'display_name': fullName},
     );
     return _session(result.session);
   });
@@ -270,6 +286,16 @@ class AuraAuthController extends ChangeNotifier implements AccessTokenProvider {
     _notify();
   }
 
+  /// Reject only the token that failed; an older response must not revoke a
+  /// newer login or refreshed token.
+  void rejectAccessToken(String token) {
+    if (!_disposed &&
+        mode == AccessMode.authenticated &&
+        gateway?.session?.token == token) {
+      _expire();
+    }
+  }
+
   void enterDemo() {
     _generation++;
     _acceptEvents = false;
@@ -335,11 +361,11 @@ class AuraAuthController extends ChangeNotifier implements AccessTokenProvider {
     });
   }
 
-  Future<void> signUp(String email, String password) {
+  Future<void> signUp(String email, String password, {String? fullName}) {
     _acceptEvents = true;
     final generation = _generation;
     return _run((service) async {
-      final current = await service.signUp(email, password);
+      final current = await service.signUp(email, password, fullName: fullName);
       if (_disposed || generation != _generation) return;
       if (current != null && current.emailVerified) {
         mode = AccessMode.authenticated;
@@ -445,9 +471,10 @@ Future<AuraAuthController> initializeAuthentication() async {
         authFlowType: AuthFlowType.pkce,
         autoRefreshToken: true,
         detectSessionInUriPredicate: (uri) =>
-            uri.scheme == 'org.auracare.auracare_mobile_app' &&
-            uri.host == 'auth' &&
-            uri.path == '/callback',
+            (uri.scheme == 'auracare' && uri.host == 'auth-callback') ||
+            (uri.scheme == 'org.auracare.auracare_mobile_app' &&
+                uri.host == 'auth' &&
+                uri.path == '/callback'),
       ),
     );
     return AuraAuthController(gateway: SupabaseAuthGateway(supabase.client));

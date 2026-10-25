@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/appointments.dart';
 import '../data/auth_service.dart';
 import '../data/records.dart';
+import '../data/remote_records.dart';
 import '../data/api_client.dart';
+import '../data/chat_service.dart';
 import '../data/services.dart';
-import '../features/auth/auth_page.dart';
+import '../features/auth/auth.dart';
+import 'controller_auth_service.dart';
 import 'app.dart';
 import 'session.dart';
 import 'theme.dart';
@@ -23,8 +28,13 @@ class _MemoryAppointmentStore implements AppointmentStore {
 /// Changes only the entry boundary. The existing shell and health pages remain
 /// local prototypes. Each account/mode boundary disposes its previous records.
 class AuthenticationRoot extends StatefulWidget {
-  const AuthenticationRoot({super.key, required this.auth});
+  const AuthenticationRoot({
+    super.key,
+    required this.auth,
+    this.recordsFactory,
+  });
   final AuraAuthController auth;
+  final RecordsRepository Function(AuraAuthController auth)? recordsFactory;
   @override
   State<AuthenticationRoot> createState() => _AuthenticationRootState();
 }
@@ -49,6 +59,8 @@ class _AuthenticationRootState extends State<AuthenticationRoot> {
     };
     if (_boundary == next) return;
     final previous = _session;
+    // Immediately cancel pending records before old widgets detach next frame.
+    previous?.records.reset();
     _boundary = next;
     _session = next == null
         ? null
@@ -62,11 +74,23 @@ class _AuthenticationRootState extends State<AuthenticationRoot> {
                     ),
                   )
                 : null,
-            records: DemoRecordsRepository(sample: false),
+            chatService: auth.mode == AccessMode.authenticated
+                ? AuthenticatedChatService(
+                    auth: auth,
+                    createClient: () => AuraApiClient(
+                      config: ApiConfig.fromEnvironment(),
+                      tokenProvider: auth,
+                    ),
+                  )
+                : null,
+            records: auth.mode == AccessMode.demo
+                ? DemoRecordsRepository(sample: false)
+                : (widget.recordsFactory ?? authenticatedRecords)(auth),
             appointments: auth.mode == AccessMode.demo
                 ? null
                 : AppointmentsRepository(store: _MemoryAppointmentStore()),
           );
+    if (_session?.records.isRemote == true) unawaited(_session!.records.load());
     // Existing widgets detach their listeners before the old session is disposed.
     if (previous != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
@@ -93,12 +117,31 @@ class _AuthenticationRootState extends State<AuthenticationRoot> {
         title: 'AuraCare',
         theme: auracareTheme(),
         debugShowCheckedModeBanner: false,
-        home: AuthPage(auth: auth),
+        home: auth.mode == AccessMode.recovery
+            ? UpdatePasswordPage(
+                auth: ControllerAuthService(auth),
+                onPasswordUpdated: (_) {},
+              )
+            : LoginPage(
+                auth: ControllerAuthService(auth),
+                onAuthenticated: (_) {},
+                onDemoSelected: (sample) {
+                  auth.enterDemo();
+                  if (sample) _session?.records.reset(sample: true);
+                },
+                onResendVerification: ControllerAuthService(auth)
+                    .resendVerification,
+                initialMessage: auth.message ?? auth.error,
+              ),
       );
     }
     return AuracareApp(
       key: ValueKey(_boundary),
       session: _session,
+      externalAuthUser: ControllerAuthService(auth).user,
+      externalSignOut: auth.mode == AccessMode.demo
+          ? () async => auth.leaveDemo()
+          : auth.signOut,
       showOnboarding: auth.mode == AccessMode.demo,
       accessWrapper: (context, child) => Column(
         children: [
@@ -114,7 +157,9 @@ class _AuthenticationRootState extends State<AuthenticationRoot> {
                       child: Text(
                         auth.mode == AccessMode.demo
                             ? 'Synthetic demo • No account access'
-                            : 'Signed in • Health records stay local',
+                            : _session!.records.isRemote
+                            ? 'Signed in • Cloud records are deployment-gated; status shown below'
+                            : 'Signed in • Session-only records; cloud sync is disabled',
                       ),
                     ),
                     TextButton(
@@ -133,6 +178,35 @@ class _AuthenticationRootState extends State<AuthenticationRoot> {
               ),
             ),
           ),
+          if (_session!.records.isRemote)
+            ListenableBuilder(
+              listenable: _session!.records,
+              builder: (context, _) {
+                final records = _session!.records;
+                return Material(
+                  child: Column(
+                    children: [
+                      if (records.loading) const LinearProgressIndicator(),
+                      if (records.loadError != null || !records.loaded)
+                        ListTile(
+                          title: Text(
+                            records.loadError ?? 'Loading health records…',
+                          ),
+                          trailing: TextButton(
+                            onPressed: records.loading ? null : records.load,
+                            child: const Text('Retry records'),
+                          ),
+                        )
+                      else
+                        TextButton(
+                          onPressed: records.load,
+                          child: const Text('Refresh records'),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
           Expanded(child: child),
         ],
       ),
