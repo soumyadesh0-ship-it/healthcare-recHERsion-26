@@ -65,11 +65,18 @@ flag to false while keeping symptom unknowns null.
 
 An inference response has `status: experimental_result`, `model: random_forest`,
 `method_version: trained-random-forest-v1`, and a numeric research output
-`experimental_model_score`. Flutter validates the response contract but does
-**not** retain or display that numeric score. It shows a descriptive experimental
-summary, including whether development-trained BMI imputation was used. The
-target is self-reported prior diagnosis, not verified disease. There are no
-diagnostic labels, clinical risk bands, or individual disease probabilities.
+`experimental_model_score`. Flutter validates the response contract and now
+shows `experimental_model_score × 100`, rounded to one decimal, as an
+**Experimental model score** out of 100. This is a display rescaling of the
+existing research output, not a new risk formula, clinical risk percentage, or
+personal probability. Higher output means a stronger model association with the
+self-reported prior diagnosis label in the training data; it does not establish
+higher clinical risk for an individual. No diagnostic labels or clinical risk
+bands are assigned. The result also lists the actual reported changes, preserves
+regular-period encoding, and explains whether BMI was supplied or imputed.
+Detailed limitations are under “About this score”; the main card clearly states
+that this is not a PCOS risk percentage or diagnosis. Errors, missing inputs,
+out-of-scope and tracking statuses never show a generated score.
 
 ## USB-connected Android development
 

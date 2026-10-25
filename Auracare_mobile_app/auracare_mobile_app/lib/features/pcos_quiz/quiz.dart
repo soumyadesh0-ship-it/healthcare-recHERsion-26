@@ -4,6 +4,7 @@ import '../../app/session.dart';
 import '../../app/theme.dart';
 import '../../app/quiz_integration.dart';
 import 'flashcard.dart';
+import 'model_result.dart';
 import '../../core/widgets.dart';
 import '../../data/services.dart';
 import '../../data/model_quiz_service.dart';
@@ -39,8 +40,9 @@ class _QuizPageState extends State<QuizPage> {
   QuizOutcome? outcome;
   ModelQuizResult? modelResult;
   bool get live => QuizIntegrationScope.maybeOf(context)?.signedIn ?? false;
-  String get summary =>
-      live ? reportedModelQuizSummary(answers) : answers.summary;
+  String get summary => live
+      ? reportedModelQuizSummary(answers, result: modelResult)
+      : answers.summary;
   QuizOutcome scenario = QuizOutcome.fixture;
   String? validation;
   final fields = quizFields.entries.toList();
@@ -321,10 +323,14 @@ class _QuizPageState extends State<QuizPage> {
     } else if (outcome != null) {
       body.addAll([
         Heading(resultTitle),
-        Panel(color: Palette.lavender, child: Text(resultMessage)),
-        const Text(
-          'Experimental, not diagnostic. Missing or absent symptoms cannot rule out PCOS. Discuss concerns with a qualified healthcare professional.',
-        ),
+        if (live && modelResult?.status == ModelQuizStatus.experimental)
+          PcosModelResult(answers: answers, result: modelResult!)
+        else ...[
+          Panel(color: Palette.lavender, child: Text(resultMessage)),
+          const Text(
+            'Experimental, not diagnostic. Missing or absent symptoms cannot rule out PCOS. Discuss concerns with a qualified healthcare professional.',
+          ),
+        ],
         Panel(child: SelectableText(summary)),
         FilledButton(
           onPressed: () => copyText(context, summary),
@@ -569,7 +575,7 @@ class _QuizPageState extends State<QuizPage> {
             ),
           Text(
             live
-                ? 'Submit only after reviewing your answers. Unknown core inputs produce no model result. Ages outside 18–45 show scope limits; known diagnosis routes to tracking. The numeric research score is not displayed.'
+                ? 'Submit only after reviewing your answers. Unknown core inputs produce no model result. Ages outside 18–45 show scope limits; known diagnosis routes to tracking. The experimental model score is shown out of 100, not as a clinical risk percentage.'
                 : 'Unknown core inputs show insufficient inputs. Ages outside 18–45 show scope limits. Known diagnosis goes to tracking. No scores are calculated.',
           ),
         ]);

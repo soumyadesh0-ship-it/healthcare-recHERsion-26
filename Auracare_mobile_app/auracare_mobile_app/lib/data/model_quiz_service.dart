@@ -17,9 +17,16 @@ enum ModelQuizStatus {
 }
 
 class ModelQuizResult {
-  const ModelQuizResult(this.status, {this.bmiImputed = false});
+  const ModelQuizResult(
+    this.status, {
+    this.bmiImputed = false,
+    this.experimentalScore,
+  });
   final ModelQuizStatus status;
   final bool bmiImputed;
+  final double? experimentalScore;
+  double? get scoreOutOf100 =>
+      experimentalScore == null ? null : experimentalScore! * 100;
 }
 
 /// Only the model's exact eight features and optional routing flag are sent.
@@ -97,10 +104,11 @@ class AuthenticatedModelQuizService implements ModelQuizService {
               body['bmi_imputed'] is! bool) {
             return const ModelQuizResult(ModelQuizStatus.unavailable);
           }
-          // The numeric developer output is deliberately not retained in UI state.
+          // Preserve the research output without presenting it as clinical risk.
           return ModelQuizResult(
             ModelQuizStatus.experimental,
             bmiImputed: body['bmi_imputed'] as bool,
+            experimentalScore: score.toDouble(),
           );
         case 'insufficient_inputs':
           return const ModelQuizResult(ModelQuizStatus.insufficient);
@@ -140,7 +148,11 @@ Uri modelQuizEndpoint(Uri base, {bool allowLocalHttp = false}) {
   return base.replace(path: '${path}pcos/model-assessment');
 }
 
-String reportedModelQuizSummary(QuizAnswers answers) =>
+String reportedModelQuizSummary(
+  QuizAnswers answers, {
+  ModelQuizResult? result,
+}) =>
+    '${result?.scoreOutOf100 == null ? '' : 'Experimental model score: ${result!.scoreOutOf100!.toStringAsFixed(1)} / 100\nNot a clinical risk score or personal PCOS probability.\n'}'
     'Reported questionnaire answers\n'
     'Age: ${answers.age ?? 'Not supplied'}\n'
     'BMI: ${answers.bmi?.toStringAsFixed(1) ?? 'Not supplied'}\n'

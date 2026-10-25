@@ -21,6 +21,7 @@ class ModelService implements ModelQuizService {
             const ModelQuizResult(
               ModelQuizStatus.experimental,
               bmiImputed: true,
+              experimentalScore: .314159,
             ),
           )
         : pending.future;
@@ -94,6 +95,11 @@ void main() {
       service.retry = true;
       await tap(tester, 'Retry model service');
       expect(find.text('Experimental model summary'), findsOneWidget);
+      expect(find.text('31.4 / 100'), findsOneWidget);
+      expect(
+        find.text('Not a PCOS risk percentage or diagnosis.'),
+        findsOneWidget,
+      );
       expect(
         find.textContaining('development-trained imputation'),
         findsOneWidget,
