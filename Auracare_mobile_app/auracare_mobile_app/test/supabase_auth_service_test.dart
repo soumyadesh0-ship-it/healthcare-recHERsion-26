@@ -39,9 +39,11 @@ Map<String, Object?> _user() => {
   'created_at': '2026-10-25T00:00:00Z',
 };
 
-String _accessToken() {
+String _accessToken({bool expired = false}) {
   final expiry =
-      DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/
+      DateTime.now()
+          .add(Duration(hours: expired ? -1 : 1))
+          .millisecondsSinceEpoch ~/
       1000;
   final payload = base64Url
       .encode(utf8.encode(jsonEncode({'sub': 'test-user', 'exp': expiry})))
@@ -162,8 +164,47 @@ void main() {
     expect(user.email, 'alex@example.com');
     expect(user.displayName, 'Alex');
     expect(restoredUser?.id, 'test-user');
+    expect(await service.accessToken(), accessToken);
     expect(service.supportsGoogleSignIn, isFalse);
   });
+
+  test(
+    'model requests refresh expired sessions and never invent a token',
+    () async {
+      final validToken = _accessToken();
+      var requests = 0;
+      final client = _client(
+        MockClient((request) async {
+          requests++;
+          if (requests == 2) {
+            expect(request.url.queryParameters['grant_type'], 'refresh_token');
+            expect(
+              jsonDecode(request.body)['refresh_token'],
+              'refresh-test-token',
+            );
+          }
+          return _jsonResponse(200, {
+            'access_token': requests == 1
+                ? _accessToken(expired: true)
+                : validToken,
+            'token_type': 'bearer',
+            'expires_in': requests == 1 ? -3600 : 3600,
+            'refresh_token': 'refresh-test-token',
+            'user': _user(),
+          });
+        }),
+      );
+      addTearDown(client.dispose);
+      final service = SupabaseAuthService(client);
+      expect(await service.accessToken(), isNull);
+      await service.signInWithPassword(
+        email: 'alex@example.com',
+        password: 'synthetic-password',
+      );
+      expect(await service.accessToken(), validToken);
+      expect(requests, 2);
+    },
+  );
 
   test('password update uses the authenticated Supabase session', () async {
     final accessToken = _accessToken();

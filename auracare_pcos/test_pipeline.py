@@ -17,7 +17,9 @@ class DataAndInferenceTests(unittest.TestCase):
         import hashlib
         audit = json.loads((ROOT/'outputs/data_audit.json').read_text())
         for name, digest in audit['raw_file_sha256'].items():
-            self.assertEqual(hashlib.sha256((ROOT/'data/raw'/name).read_bytes()).hexdigest(), digest)
+            payload = (ROOT/'data/raw'/name).read_bytes()
+            # Delivered hashes use LF; Windows Git checkouts may use CRLF.
+            self.assertEqual(hashlib.sha256(payload.replace(b'\r\n', b'\n')).hexdigest(), digest)
 
     def test_split_integrity(self):
         manifest = pd.read_csv(ROOT/'outputs/split_manifest.csv')

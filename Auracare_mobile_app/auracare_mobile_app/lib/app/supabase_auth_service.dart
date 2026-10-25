@@ -63,10 +63,25 @@ bool isSupabasePublishableKey(String key) {
   }
 }
 
-class SupabaseAuthService implements AuthService {
+class SupabaseAuthService implements AuthService, AccessTokenProvider {
   const SupabaseAuthService(this.client);
 
   final supabase.SupabaseClient client;
+
+  @override
+  Future<String?> accessToken() => _withAuthErrors(() async {
+    final session = client.auth.currentSession;
+    if (session == null) return null;
+    if (session.isExpired) {
+      final refreshed = (await client.auth.refreshSession()).session;
+      if (refreshed?.user.id != session.user.id ||
+          client.auth.currentSession?.user.id != session.user.id) {
+        return null;
+      }
+      return refreshed?.accessToken;
+    }
+    return session.accessToken;
+  });
 
   @override
   bool get isConfigured => true;

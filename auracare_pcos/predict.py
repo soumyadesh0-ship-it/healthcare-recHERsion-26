@@ -6,7 +6,10 @@ from pathlib import Path
 import argparse, json, math
 import joblib
 import pandas as pd
-from pcos_data import FEATURES
+try:
+    from .pcos_data import FEATURES
+except ImportError:  # Preserve direct CLI execution from the model directory.
+    from pcos_data import FEATURES
 
 ROOT = Path(__file__).resolve().parent
 BINARY = FEATURES[2:]
@@ -16,7 +19,7 @@ def number(value):
         raise ValueError('Expected a finite JSON number')
     return float(value)
 
-def predict_quiz(answers, model_path=None):
+def predict_quiz(answers, model_path=None, *, bundle=None):
     if not isinstance(answers, dict):
         raise ValueError('Answers must be a JSON object')
     unknown = set(answers) - set(FEATURES) - {'known_pcos_diagnosis'}
@@ -51,10 +54,11 @@ def predict_quiz(answers, model_path=None):
         if not 10 <= bmi <= 70:
             raise ValueError('BMI must be between 10 and 70 for this experiment')
     values['bmi'] = float('nan') if bmi is None else bmi
-    if model_path is None:
-        selection = json.loads((ROOT/'models/selected_model.json').read_text())
-        model_path = ROOT/'models'/selection['path']
-    bundle = joblib.load(model_path)
+    if bundle is None:
+        if model_path is None:
+            selection = json.loads((ROOT/'models/selected_model.json').read_text())
+            model_path = ROOT/'models'/selection['path']
+        bundle = joblib.load(model_path)
     if bundle['features'] != FEATURES:
         raise ValueError('Feature contract does not match model')
     score = float(bundle['model'].predict_proba(pd.DataFrame([values], columns=FEATURES))[0,1])

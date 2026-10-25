@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import 'dart:async';
 
 import 'auth_service.dart';
+import 'quiz_integration.dart';
 import 'session.dart';
 import 'setup_preference.dart';
 import '../data/records.dart';
@@ -31,6 +33,8 @@ class _AuracareAppState extends State<AuracareApp> {
   String? lastLayoutMetrics;
   late final AuthService auth =
       widget.authService ?? const UnconfiguredAuthService();
+  final apiClient = http.Client();
+  late final modelQuizService = configuredModelQuizService(auth, apiClient);
   StreamSubscription<AuthUser?>? authSubscription;
   StreamSubscription<void>? passwordRecoverySubscription;
   AuthUser? authenticatedUser;
@@ -149,6 +153,7 @@ class _AuracareAppState extends State<AuracareApp> {
 
   @override
   void dispose() {
+    apiClient.close();
     authSubscription?.cancel();
     passwordRecoverySubscription?.cancel();
     if (widget.session == null) session.dispose();
@@ -158,73 +163,81 @@ class _AuracareAppState extends State<AuracareApp> {
   @override
   Widget build(BuildContext context) => SessionScope(
     session: session,
-    child: ListenableBuilder(
-      listenable: session,
-      builder: (context, _) => MaterialApp(
-        title: 'AuraCare',
-        debugShowCheckedModeBanner: false,
-        theme: auracareTheme(),
-        navigatorObservers: [auraRouteObserver],
-        routes: kDebugMode
-            ? {
-                '/debug/onboarding': (context) =>
-                    Onboarding(onEnter: (_) => Navigator.pop(context)),
-                '/debug/splash': (context) =>
-                    WelcomeSplash(onContinue: () => Navigator.pop(context)),
+    child: QuizIntegrationScope(
+      signedIn: authenticatedUser != null && !demoMode,
+      userId: authenticatedUser?.id,
+      service: modelQuizService,
+      child: ListenableBuilder(
+        listenable: session,
+        builder: (context, _) => MaterialApp(
+          title: 'AuraCare',
+          debugShowCheckedModeBanner: false,
+          theme: auracareTheme(),
+          navigatorObservers: [auraRouteObserver],
+          routes: kDebugMode
+              ? {
+                  '/debug/onboarding': (context) =>
+                      Onboarding(onEnter: (_) => Navigator.pop(context)),
+                  '/debug/splash': (context) =>
+                      WelcomeSplash(onContinue: () => Navigator.pop(context)),
+                }
+              : const {},
+          builder: (context, child) {
+            final media = MediaQuery.of(context);
+            if (kDebugMode) {
+              final physicalSize = Size(
+                media.size.width * media.devicePixelRatio,
+                media.size.height * media.devicePixelRatio,
+              );
+              final metrics =
+                  'logical=${media.size.width.toStringAsFixed(1)}x'
+                  '${media.size.height.toStringAsFixed(1)} dp, '
+                  'physical=${physicalSize.width.toStringAsFixed(0)}x'
+                  '${physicalSize.height.toStringAsFixed(0)} px, '
+                  'dpr=${media.devicePixelRatio.toStringAsFixed(2)}, '
+                  'textScale=${(media.textScaler.scale(14) / 14).toStringAsFixed(2)}, '
+                  'padding=${media.padding}, viewPadding=${media.viewPadding}, '
+                  'viewInsets=${media.viewInsets}, platform=${Theme.of(context).platform}';
+              if (metrics != lastLayoutMetrics) {
+                lastLayoutMetrics = metrics;
+                debugPrint('[AuraCare layout] $metrics');
               }
-            : const {},
-        builder: (context, child) {
-          final media = MediaQuery.of(context);
-          if (kDebugMode) {
-            final physicalSize = Size(
-              media.size.width * media.devicePixelRatio,
-              media.size.height * media.devicePixelRatio,
-            );
-            final metrics =
-                'logical=${media.size.width.toStringAsFixed(1)}x'
-                '${media.size.height.toStringAsFixed(1)} dp, '
-                'physical=${physicalSize.width.toStringAsFixed(0)}x'
-                '${physicalSize.height.toStringAsFixed(0)} px, '
-                'dpr=${media.devicePixelRatio.toStringAsFixed(2)}, '
-                'textScale=${(media.textScaler.scale(14) / 14).toStringAsFixed(2)}, '
-                'padding=${media.padding}, viewPadding=${media.viewPadding}, '
-                'viewInsets=${media.viewInsets}, platform=${Theme.of(context).platform}';
-            if (metrics != lastLayoutMetrics) {
-              lastLayoutMetrics = metrics;
-              debugPrint('[AuraCare layout] $metrics');
             }
-          }
-          return MediaQuery(
-            data: media.copyWith(
-              disableAnimations:
-                  media.disableAnimations || session.reduceMotion,
-            ),
-            child: child!,
-          );
-        },
-        home: previewOnboarding
-            ? Onboarding(
-                onEnter: (_) => setState(() => previewOnboarding = false),
-              )
-            : splash
-            ? WelcomeSplash(
-                buttonLabel: entered ? 'Continue' : 'Get started',
-                onContinue: () {
-                  if (!loading) setState(() => splash = false);
-                },
-              )
-            : !entered
-            ? Onboarding(onEnter: enter)
-            : completingPasswordRecovery
-            ? UpdatePasswordPage(auth: auth, onPasswordUpdated: updateAuthUser)
-            : authenticatedUser != null || demoMode
-            ? AppShell(authUser: authenticatedUser, onSignOut: signOut)
-            : LoginPage(
-                auth: auth,
-                onAuthenticated: updateAuthUser,
-                onDemoSelected: enterDemo,
-                initialMessage: sessionRestoreMessage,
+            return MediaQuery(
+              data: media.copyWith(
+                disableAnimations:
+                    media.disableAnimations || session.reduceMotion,
               ),
+              child: child!,
+            );
+          },
+          home: previewOnboarding
+              ? Onboarding(
+                  onEnter: (_) => setState(() => previewOnboarding = false),
+                )
+              : splash
+              ? WelcomeSplash(
+                  buttonLabel: entered ? 'Continue' : 'Get started',
+                  onContinue: () {
+                    if (!loading) setState(() => splash = false);
+                  },
+                )
+              : !entered
+              ? Onboarding(onEnter: enter)
+              : completingPasswordRecovery
+              ? UpdatePasswordPage(
+                  auth: auth,
+                  onPasswordUpdated: updateAuthUser,
+                )
+              : authenticatedUser != null || demoMode
+              ? AppShell(authUser: authenticatedUser, onSignOut: signOut)
+              : LoginPage(
+                  auth: auth,
+                  onAuthenticated: updateAuthUser,
+                  onDemoSelected: enterDemo,
+                  initialMessage: sessionRestoreMessage,
+                ),
+        ),
       ),
     ),
   );

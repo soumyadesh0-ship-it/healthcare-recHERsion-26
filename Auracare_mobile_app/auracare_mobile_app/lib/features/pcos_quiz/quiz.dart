@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../app/session.dart';
+import '../../app/theme.dart';
+import '../../app/quiz_integration.dart';
+import 'flashcard.dart';
 import '../../core/widgets.dart';
 import '../../data/services.dart';
+import '../../data/model_quiz_service.dart';
 
 class QuizPage extends StatefulWidget {
   const QuizPage({super.key});
@@ -11,21 +15,54 @@ class QuizPage extends StatefulWidget {
 }
 
 class _QuizPageState extends State<QuizPage> {
-  final answers = QuizAnswers();
+  var answers = QuizAnswers();
   final answered = <String>{};
   final age = TextEditingController(),
       kg = TextEditingController(),
       cm = TextEditingController();
   final form = GlobalKey<FormState>();
+  final scroll = ScrollController();
+  String? visibleScreen;
+  int get reviewStep => fields.length + 1;
   int step = -1; // intro, then age/context, six binary questions, then review
   bool busy = false;
-  int attempt = 0;
   QuizOutcome? outcome;
+  ModelQuizResult? modelResult;
+  bool get live => QuizIntegrationScope.maybeOf(context)?.signedIn ?? false;
+  String get summary =>
+      live ? reportedModelQuizSummary(answers) : answers.summary;
   QuizOutcome scenario = QuizOutcome.fixture;
   String? validation;
   final fields = quizFields.entries.toList();
+  String? identity;
+  int generation = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final integration = QuizIntegrationScope.maybeOf(context);
+    final nextIdentity =
+        '${integration?.signedIn ?? false}-${integration?.userId}';
+    if (identity != null && identity != nextIdentity) {
+      // Never carry questionnaire contents/results into another account/demo.
+      generation++;
+      answers = QuizAnswers();
+      answered.clear();
+      age.clear();
+      kg.clear();
+      cm.clear();
+      step = -1;
+      busy = false;
+      outcome = null;
+      modelResult = null;
+      validation = null;
+    }
+    identity = nextIdentity;
+  }
+
   @override
   void dispose() {
+    scroll.dispose();
     age.dispose();
     kg.dispose();
     cm.dispose();
@@ -37,7 +74,8 @@ class _QuizPageState extends State<QuizPage> {
     setState(() {
       if (outcome != null) {
         outcome = null;
-        step = 7;
+        modelResult = null;
+        step = reviewStep;
       } else if (step >= 0) {
         step--;
       }
@@ -57,11 +95,16 @@ class _QuizPageState extends State<QuizPage> {
     if (step == 0) {
       if (!readContext()) return;
       if (answers.knownDiagnosis == true) {
-        setState(() => outcome = QuizOutcome.tracking);
+        setState(() {
+          modelResult = null;
+          outcome = QuizOutcome.tracking;
+        });
         return;
       }
     }
-    if (step >= 1 && step <= 6 && !answered.contains(fields[step - 1].key)) {
+    if (step >= 1 &&
+        step <= fields.length &&
+        !answered.contains(fields[step - 1].key)) {
       setState(
         () => validation =
             'Choose Yes, No or Not sure. No answer is preselected.',
@@ -76,24 +119,56 @@ class _QuizPageState extends State<QuizPage> {
 
   Future<void> submit() async {
     if (busy) return;
+    if (answers.age == null ||
+        fields.any((field) => !answered.contains(field.key))) {
+      setState(
+        () => validation = 'Complete context and choose an answer for every question. Not sure is allowed.',
+      );
+      return;
+    }
+    final requestGeneration = ++generation;
     setState(() {
       busy = true;
       outcome = null;
-      attempt++;
+      modelResult = null;
     });
+    if (live) {
+      final service = QuizIntegrationScope.maybeOf(context)?.service;
+      ModelQuizResult result;
+      try {
+        result = service == null
+            ? const ModelQuizResult(ModelQuizStatus.unavailable)
+            : await service.assess(answers);
+      } catch (_) {
+        result = const ModelQuizResult(ModelQuizStatus.unavailable);
+      }
+      if (!mounted || requestGeneration != generation) return;
+      setState(() {
+        modelResult = result;
+        outcome = switch (result.status) {
+          ModelQuizStatus.experimental => QuizOutcome.fixture,
+          ModelQuizStatus.insufficient => QuizOutcome.insufficient,
+          ModelQuizStatus.outsideScope => QuizOutcome.outsideScope,
+          ModelQuizStatus.tracking => QuizOutcome.tracking,
+          _ => QuizOutcome.unavailable,
+        };
+        busy = false;
+      });
+      return;
+    }
     final QuizService service = scenario == QuizOutcome.unavailable
         ? LiveUnavailableQuizService()
         : DemoQuizService(scenario: scenario);
     try {
       final result = await service.assess(answers);
-      if (!mounted) return;
+      if (!mounted || requestGeneration != generation) return;
       setState(() {
         outcome = result;
         busy = false;
         if (scenario == QuizOutcome.failure) scenario = QuizOutcome.fixture;
       });
     } catch (_) {
-      if (mounted) {
+      if (mounted && requestGeneration == generation) {
         setState(() {
           outcome = QuizOutcome.failure;
           busy = false;
@@ -116,108 +191,138 @@ class _QuizPageState extends State<QuizPage> {
         answered.add(field.key);
       }
       outcome = null;
-      step = 7;
+      step = reviewStep;
+      modelResult = null;
       validation = null;
     });
-    tell(
-      context,
-      'Explicit fictional example loaded — not your health history',
+  }
+
+  Widget questionCard() {
+    final field = fields[step - 1];
+    return QuizCardTransition(
+      child: QuizFlashcard(
+        key: ValueKey(field.key),
+        field: field.key,
+        question: field.value,
+        index: step - 1,
+        selected: answers.binary[field.key],
+        answered: answered.contains(field.key),
+        onAnswer: (value) => setState(() {
+          answers.binary[field.key] = value;
+          answered.add(field.key);
+          validation = null;
+        }),
+      ),
     );
   }
 
-  List<Widget> choices(String key, String label) => [
-    Text(label, style: Theme.of(context).textTheme.titleLarge),
-    Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final option in <(int?, String)>[
-          (1, 'Yes'),
-          (0, 'No'),
-          (null, 'Not sure'),
-        ])
-          ChoiceChip(
-            label: Text(option.$2),
-            selected:
-                answered.contains(key) && answers.binary[key] == option.$1,
-            onSelected: (_) => setState(() {
-              answers.binary[key] = option.$1;
-              answered.add(key);
-              validation = null;
-            }),
-          ),
-      ],
-    ),
-  ];
-  String get resultTitle => switch (outcome!) {
-    QuizOutcome.fixture => 'A summary, not a diagnosis.',
-    QuizOutcome.unavailable => 'Live assessment unavailable',
-    QuizOutcome.failure => 'Demo service failed',
-    QuizOutcome.insufficient => 'Insufficient inputs',
-    QuizOutcome.outsideScope => 'Outside experimental age scope',
-    QuizOutcome.tracking => 'Continue with your history',
-  };
-  String get resultMessage => switch (outcome!) {
-    QuizOutcome.fixture => 'Labeled demonstration fixture. No model was run and this is not a personal result. No risk band or probability is displayed.',
-    QuizOutcome.unavailable => 'No verified model service or endpoint is connected. Your answers remain available to edit or copy.',
-    QuizOutcome.failure => 'Simulated failure. Your answers are preserved. Retry uses the demonstration fixture, not a model.',
-    QuizOutcome.insufficient => 'Unknown answers remain unknown. This prototype requires age and all core answers to be known before showing the fixture; this is not a verified model minimum-input rule. You can still copy the descriptive summary.',
-    QuizOutcome.outsideScope => 'The experiment is limited to ages 18–45. This does not limit access to the rest of Auracare. No assessment was run.',
-    QuizOutcome.tracking => 'A reported known diagnosis routes to tracking and consultation preparation, without another diagnostic score. The app does not verify that diagnosis.',
-  };
+  String get resultTitle => live && modelResult != null
+      ? switch (modelResult!.status) {
+          ModelQuizStatus.experimental => 'Experimental model summary',
+          ModelQuizStatus.authenticationRequired => 'Sign in again to submit',
+          ModelQuizStatus.invalidInputs => 'Check your questionnaire inputs',
+          ModelQuizStatus.unavailable => 'Live assessment unavailable',
+          ModelQuizStatus.insufficient => 'Insufficient inputs',
+          ModelQuizStatus.outsideScope => 'Outside experimental age scope',
+          ModelQuizStatus.tracking => 'Continue with your history',
+        }
+      : switch (outcome!) {
+          QuizOutcome.fixture => 'A summary, not a diagnosis.',
+          QuizOutcome.unavailable => 'Live assessment unavailable',
+          QuizOutcome.failure => 'Demo service failed',
+          QuizOutcome.insufficient => 'Insufficient inputs',
+          QuizOutcome.outsideScope => 'Outside experimental age scope',
+          QuizOutcome.tracking => 'Continue with your history',
+        };
+  String get resultMessage => live && modelResult != null
+      ? switch (modelResult!.status) {
+          ModelQuizStatus.experimental =>
+            'The trained Random Forest processed your questionnaire answers. It was developed using self-reported prior diagnoses, not clinically verified diagnoses. This experiment cannot confirm or rule out PCOS and does not estimate your personal probability of PCOS.${modelResult!.bmiImputed ? ' BMI was not supplied; the model used its development-trained imputation.' : ''}',
+          ModelQuizStatus.authenticationRequired => 'Your session could not be verified. Your answers remain here. Sign in again before retrying.',
+          ModelQuizStatus.invalidInputs => 'The service rejected these inputs. Review your age, optional measurements and answers. Supplied BMI must be between 10 and 70 for this experiment.',
+          ModelQuizStatus.unavailable => 'The shared model service is not configured or could not be reached. Your answers remain available to edit or retry. No demonstration result has been substituted.',
+          ModelQuizStatus.insufficient => 'No score was produced. Age and all six answers must be known for this model. Not sure stays unknown; optional BMI may be omitted.',
+          ModelQuizStatus.outsideScope => 'The experiment is limited to ages 18–45. No model result was produced. You can still use the rest of AuraCare.',
+          ModelQuizStatus.tracking => 'A reported known diagnosis routes to tracking and consultation preparation without rescoring.',
+        }
+      : switch (outcome!) {
+          QuizOutcome.fixture => 'Labeled demonstration fixture. No model was run and this is not a personal result. No risk band or probability is displayed.',
+          QuizOutcome.unavailable => 'No verified model service or endpoint is connected. Your answers remain available to edit or copy.',
+          QuizOutcome.failure => 'Simulated failure. Your answers are preserved. Retry uses the demonstration fixture, not a model.',
+          QuizOutcome.insufficient => 'Unknown answers remain unknown. This prototype requires age and all core answers to be known before showing the fixture; this is not a verified model minimum-input rule. You can still copy the descriptive summary.',
+          QuizOutcome.outsideScope => 'The experiment is limited to ages 18–45. This does not limit access to the rest of Auracare. No assessment was run.',
+          QuizOutcome.tracking => 'A reported known diagnosis routes to tracking and consultation preparation, without another diagnostic score. The app does not verify that diagnosis.',
+        };
   @override
   Widget build(BuildContext context) {
+    final screen = '$step-$busy-${outcome?.name}';
+    if (visibleScreen != screen) {
+      visibleScreen = screen;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && scroll.hasClients) scroll.jumpTo(0);
+      });
+    }
     final body = <Widget>[];
     if (busy) {
       body.addAll([
-        const Heading('Submitting demo answers'),
+        Heading(live ? 'Submitting questionnaire' : 'Submitting demo answers'),
         Semantics(
-          label: 'Demo service loading',
+          label: live ? 'Model service loading' : 'Demo service loading',
           child: const LinearProgressIndicator(),
         ),
-        const Text(
-          'Only a demonstration service is being used. No model or remote endpoint is running.',
+        Text(
+          live
+              ? 'Sending only the reviewed questionnaire to the shared authenticated service.'
+              : 'Only a demonstration service is being used. No model or remote endpoint is running.',
         ),
       ]);
     } else if (step < 0 && outcome == null) {
       body.addAll([
         const Heading('Make room for\nyour questions.'),
-        const Text(
-          'Experimental PCOS questionnaire · synthetic demo. It cannot diagnose or rule out PCOS and does not estimate your chance of having it.',
+        Text(
+          live
+              ? 'Experimental PCOS questionnaire. It cannot diagnose or rule out PCOS and does not estimate your chance of having it.'
+              : 'Experimental PCOS questionnaire · synthetic demo. It cannot diagnose or rule out PCOS and does not estimate your chance of having it.',
         ),
-        const Panel(
+        Panel(
           child: Text(
-            'No model or backend exists in this checkout. Use fictional answers only. This flow demonstrates questions, review and service states; nothing is uploaded or saved after restart.',
+            live
+                ? 'On submission, only these questionnaire answers are sent to the team’s shared backend using your signed-in session. The backend runs the existing experimental model without storing this questionnaire. Journal and daily records are not included.'
+                : 'This screen uses a demonstration service. Use fictional answers only; nothing is uploaded or saved after restart. Sign in to use the shared experimental model service.',
           ),
         ),
         const Text(
-          'Question wording/time windows are not verified against a local model contract. No adaptive AI, clinical validation or medical review is claimed.',
+          'The six questions follow the existing PCOS field contract. No clinical validation or medical review is claimed.',
         ),
         FilledButton(
           onPressed: () => setState(() => step = 0),
-          child: const Text('Begin demo questionnaire'),
+          child: Text(
+            live ? 'Begin questionnaire' : 'Begin demo questionnaire',
+          ),
         ),
-        OutlinedButton(
-          onPressed: synthetic,
-          child: const Text('Load explicit synthetic example'),
-        ),
+        if (!live)
+          OutlinedButton(
+            onPressed: synthetic,
+            child: const Text('Load explicit synthetic example'),
+          ),
       ]);
     } else if (outcome != null) {
       body.addAll([
         Heading(resultTitle),
-        ErrorNotice(resultMessage),
+        Panel(color: Palette.lavender, child: Text(resultMessage)),
         const Text(
           'Experimental, not diagnostic. Missing or absent symptoms cannot rule out PCOS. Discuss concerns with a qualified healthcare professional.',
         ),
-        Panel(child: SelectableText(answers.summary)),
+        Panel(child: SelectableText(summary)),
         FilledButton(
-          onPressed: () => copyText(context, answers.summary),
+          onPressed: () => copyText(context, summary),
           child: const Text('Copy reported-answer summary'),
         ),
         OutlinedButton(
           onPressed: () => setState(() {
             outcome = null;
-            step = 7;
+            modelResult = null;
+            step = reviewStep;
           }),
           child: const Text('Edit answers'),
         ),
@@ -225,7 +330,7 @@ class _QuizPageState extends State<QuizPage> {
             outcome == QuizOutcome.unavailable)
           OutlinedButton(
             onPressed: submit,
-            child: const Text('Retry demo service'),
+            child: Text(live ? 'Retry model service' : 'Retry demo service'),
           ),
         if (outcome == QuizOutcome.tracking)
           OutlinedButton(
@@ -253,100 +358,127 @@ class _QuizPageState extends State<QuizPage> {
     } else {
       body.addAll([
         Text(
-          step == 7 ? 'Review before submitting' : 'Step ${step + 1} of 7',
+          step == reviewStep
+              ? 'Review before submitting'
+              : step == 0
+              ? 'Before we begin'
+              : 'Question $step of ${fields.length}',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        LinearProgressIndicator(value: (step + 1) / 8),
+        if (step > 0 && step < reviewStep)
+          Semantics(
+            label: 'Question $step of ${fields.length}',
+            child: Row(
+              children: [
+                for (var i = 0; i < fields.length; i++)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Container(
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: i < step ? Palette.purple : Palette.lavender,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
       ]);
       if (step == 0) {
         body.add(
-          Form(
-            key: form,
-            child: Column(
-              children: spaced([
-                const Heading('A little context.'),
-                TextFormField(
-                  controller: age,
-                  decoration: const InputDecoration(labelText: 'Age (years)'),
-                  keyboardType: TextInputType.number,
-                  validator: (v) {
-                    final n = int.tryParse(v ?? '');
-                    return n == null || n < 1 || n > 120
-                        ? 'Enter an age from 1 to 120. Experimental scope is 18–45.'
-                        : null;
-                  },
-                ),
-                const Text(
-                  'Weight and height are optional. BMI is derived only if both are explicitly entered; it is not interpreted as a diagnosis.',
-                ),
-                TextFormField(
-                  controller: kg,
-                  decoration: const InputDecoration(
-                    labelText: 'Weight (kg, optional)',
+          Panel(
+            color: Palette.lavender,
+            child: Form(
+              key: form,
+              child: Column(
+                children: spaced([
+                  const Heading('A little context.'),
+                  TextFormField(
+                    controller: age,
+                    decoration: const InputDecoration(labelText: 'Age (years)'),
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                      final n = int.tryParse(v ?? '');
+                      return n == null || n < 1 || n > 120
+                          ? 'Enter an age from 1 to 120. Experimental scope is 18–45.'
+                          : null;
+                    },
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                  const Text(
+                    'Weight and height are optional. BMI is derived only if both are explicitly entered; it is not interpreted as a diagnosis.',
                   ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) {
-                      return cm.text.isEmpty
-                          ? null
-                          : 'Enter both weight and height, or leave both empty.';
-                    }
-                    final n = double.tryParse(v);
-                    return n == null || !n.isFinite || n <= 0 || n > 500
-                        ? 'Enter a positive weight up to 500 kg.'
-                        : null;
-                  },
-                ),
-                TextFormField(
-                  controller: cm,
-                  decoration: const InputDecoration(
-                    labelText: 'Height (cm, optional)',
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) {
-                      return kg.text.isEmpty
-                          ? null
-                          : 'Enter both weight and height, or leave both empty.';
-                    }
-                    final n = double.tryParse(v);
-                    return n == null || !n.isFinite || n < 30 || n > 250
-                        ? 'Enter height from 30 to 250 cm.'
-                        : null;
-                  },
-                ),
-                const Text(
-                  'Previously diagnosed with PCOS by a clinician? (optional routing flag)',
-                ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final value in [true, false])
-                      ChoiceChip(
-                        label: Text(value ? 'Yes' : 'No'),
-                        selected: answers.knownDiagnosis == value,
-                        onSelected: (_) =>
-                            setState(() => answers.knownDiagnosis = value),
-                      ),
-                    ActionChip(
-                      label: const Text('Not sure / clear'),
-                      onPressed: () =>
-                          setState(() => answers.knownDiagnosis = null),
+                  TextFormField(
+                    controller: kg,
+                    decoration: const InputDecoration(
+                      labelText: 'Weight (kg, optional)',
                     ),
-                  ],
-                ),
-              ]),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) {
+                        return cm.text.isEmpty
+                            ? null
+                            : 'Enter both weight and height, or leave both empty.';
+                      }
+                      final n = double.tryParse(v);
+                      return n == null || !n.isFinite || n <= 0 || n > 500
+                          ? 'Enter a positive weight up to 500 kg.'
+                          : null;
+                    },
+                  ),
+                  TextFormField(
+                    controller: cm,
+                    decoration: const InputDecoration(
+                      labelText: 'Height (cm, optional)',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) {
+                        return kg.text.isEmpty
+                            ? null
+                            : 'Enter both weight and height, or leave both empty.';
+                      }
+                      final n = double.tryParse(v);
+                      return n == null || !n.isFinite || n < 30 || n > 250
+                          ? 'Enter height from 30 to 250 cm.'
+                          : null;
+                    },
+                  ),
+                  const Text(
+                    'Previously diagnosed with PCOS by a clinician? (optional routing flag)',
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final value in [true, false])
+                        ChoiceChip(
+                          label: Text(value ? 'Yes' : 'No'),
+                          selected: answers.knownDiagnosis == value,
+                          onSelected: (_) =>
+                              setState(() => answers.knownDiagnosis = value),
+                        ),
+                      ActionChip(
+                        label: const Text('Not sure / clear'),
+                        onPressed: () =>
+                            setState(() => answers.knownDiagnosis = null),
+                      ),
+                    ],
+                  ),
+                ]),
+              ),
             ),
           ),
         );
-      } else if (step <= 6) {
+      } else if (step <= fields.length) {
         final field = fields[step - 1];
-        body.addAll(choices(field.key, field.value));
+        body.add(questionCard());
         if (field.key == 'regular_periods' &&
             answers.binary[field.key] == 0 &&
             answered.contains(field.key)) {
@@ -359,8 +491,10 @@ class _QuizPageState extends State<QuizPage> {
           );
         }
         body.add(
-          const Text(
-            'Choose a fictional response. Not sure stays null; it is never converted to No.',
+          Text(
+            live
+                ? 'Not sure stays unknown.'
+                : 'Demonstration only. Not sure stays unknown.',
           ),
         );
       } else {
@@ -368,7 +502,7 @@ class _QuizPageState extends State<QuizPage> {
           const Heading('Check your answers.'),
           Panel(
             child: Text(
-              'Age: ${answers.age ?? 'Unknown'}\nBMI: ${answers.bmi?.toStringAsFixed(1) ?? 'Not supplied'}\nKnown diagnosis: ${answers.knownDiagnosis == null
+              'Age: ${answers.age ?? 'Unknown'}\nWeight: ${answers.kg == null ? 'Not supplied' : '${answers.kg} kg'}\nHeight: ${answers.cm == null ? 'Not supplied' : '${answers.cm} cm'}\nBMI: ${answers.bmi?.toStringAsFixed(1) ?? 'Not supplied'}\nKnown diagnosis: ${answers.knownDiagnosis == null
                   ? 'Unknown'
                   : answers.knownDiagnosis!
                   ? 'Yes'
@@ -382,7 +516,9 @@ class _QuizPageState extends State<QuizPage> {
           for (var i = 0; i < fields.length; i++)
             ActionCard(
               title: fields[i].value,
-              subtitle: answers.binary[fields[i].key] == null
+              subtitle: !answered.contains(fields[i].key)
+                  ? 'Unanswered'
+                  : answers.binary[fields[i].key] == null
                   ? 'Not sure'
                   : answers.binary[fields[i].key] == 1
                   ? 'Yes'
@@ -390,63 +526,68 @@ class _QuizPageState extends State<QuizPage> {
               icon: Icons.edit_outlined,
               onTap: () => setState(() => step = i + 1),
             ),
-          DropdownButtonFormField<QuizOutcome>(
-            itemHeight: null,
-            initialValue: scenario,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Demo service scenario',
+          if (!live)
+            DropdownButtonFormField<QuizOutcome>(
+              itemHeight: null,
+              initialValue: scenario,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Demo service scenario',
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: QuizOutcome.fixture,
+                  child: Text('Labeled fixture (no model)'),
+                ),
+                DropdownMenuItem(
+                  value: QuizOutcome.failure,
+                  child: Text('Fail once, then retry fixture'),
+                ),
+                DropdownMenuItem(
+                  value: QuizOutcome.unavailable,
+                  child: Text('Live service unavailable'),
+                ),
+              ],
+              onChanged: busy ? null : (v) => setState(() => scenario = v!),
             ),
-            items: const [
-              DropdownMenuItem(
-                value: QuizOutcome.fixture,
-                child: Text('Labeled fixture (no model)'),
-              ),
-              DropdownMenuItem(
-                value: QuizOutcome.failure,
-                child: Text('Fail once, then retry fixture'),
-              ),
-              DropdownMenuItem(
-                value: QuizOutcome.unavailable,
-                child: Text('Live service unavailable'),
-              ),
-            ],
-            onChanged: busy ? null : (v) => setState(() => scenario = v!),
-          ),
-          const Text(
-            'Unknown core inputs show insufficient inputs. Ages outside 18–45 show scope limits. Known diagnosis goes to tracking. No scores are calculated.',
+          Text(
+            live
+                ? 'Submit only after reviewing your answers. Unknown core inputs produce no model result. Ages outside 18–45 show scope limits; known diagnosis routes to tracking. The numeric research score is not displayed.'
+                : 'Unknown core inputs show insufficient inputs. Ages outside 18–45 show scope limits. Known diagnosis goes to tracking. No scores are calculated.',
           ),
         ]);
       }
       if (validation != null) body.add(ErrorNotice(validation!));
-      if (busy) {
-        body.add(
-          Semantics(
-            label: 'Submitting demo answers',
-            child: LinearProgressIndicator(),
-          ),
-        );
-      }
       body.add(
-        FilledButton(
-          onPressed: busy
-              ? null
-              : step == 7
-              ? submit
-              : next,
-          child: Text(
-            busy
-                ? 'Submitting demo…'
-                : step == 7
-                ? 'Submit demo answers'
-                : 'Next',
-          ),
-        ),
-      );
-      body.add(
-        OutlinedButton(
-          onPressed: busy ? null : back,
-          child: const Text('Back'),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Flexible(
+              child: OutlinedButton(
+                onPressed: busy ? null : back,
+                child: const Text('Back'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(
+                onPressed: busy
+                    ? null
+                    : step == reviewStep
+                    ? submit
+                    : next,
+                child: Text(
+                  step == reviewStep
+                      ? live
+                            ? 'Submit questionnaire'
+                            : 'Submit demo answers'
+                      : step == fields.length
+                      ? 'Review'
+                      : 'Next',
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -455,12 +596,27 @@ class _QuizPageState extends State<QuizPage> {
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) back();
       },
-      child: PageFrame(
-        key: ValueKey(
-          '$attempt-${busy ? 'submitting' : step}-${outcome?.name}',
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Experimental PCOS quiz')),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                controller: scroll,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: spaced(body),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
         ),
-        title: 'Experimental PCOS quiz',
-        children: body,
       ),
     );
   }

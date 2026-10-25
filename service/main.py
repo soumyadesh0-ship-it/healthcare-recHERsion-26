@@ -4,7 +4,7 @@ import json
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from dotenv import load_dotenv
@@ -16,9 +16,11 @@ from google import genai
 from google.genai import types
 from httpx import HTTPError
 from postgrest.exceptions import APIError
-from pydantic import BaseModel, ConfigDict, StrictBool, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
 from supabase import ClientOptions, create_client
 from supabase_auth.errors import AuthApiError, AuthRetryableError
+
+from service import pcos_model
 
 load_dotenv()
 
@@ -53,6 +55,12 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be configured.")
     app.state.supabase_url = url
     app.state.supabase_key = key
+    try:
+        app.state.pcos_model = pcos_model.load_model()
+    except Exception:
+        # A missing/incompatible artifact must not disable existing endpoints.
+        # Never return deserialization errors or local paths to API callers.
+        app.state.pcos_model = None
     yield
 
 
@@ -78,6 +86,38 @@ class Prediction(BaseModel):
     reported_symptoms: list[str]
     method_version: str
     limitations: str
+
+
+FiniteAge = Annotated[float, Field(strict=True, ge=1, le=120, allow_inf_nan=False)]
+FiniteBMI = Annotated[float, Field(strict=True, ge=10, le=70, allow_inf_nan=False)]
+BinaryAnswer = Annotated[int, Field(strict=True, ge=0, le=1)] | StrictBool
+
+
+class ModelQuizData(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    age: FiniteAge | None = None
+    bmi: FiniteBMI | None = None
+    regular_periods: BinaryAnswer | None = None
+    weight_gain: BinaryAnswer | None = None
+    excess_hair: BinaryAnswer | None = None
+    skin_darkening: BinaryAnswer | None = None
+    hair_thinning: BinaryAnswer | None = None
+    acne: BinaryAnswer | None = None
+    known_pcos_diagnosis: StrictBool = False
+
+
+class ModelQuizResult(BaseModel):
+    status: Literal['experimental_result', 'insufficient_inputs',
+                    'outside_experimental_scope', 'tracking_journey']
+    method_version: str
+    message: str | None = None
+    missing: list[str] | None = None
+    model: str | None = None
+    experimental_model_score: float | None = None
+    score_target: str | None = None
+    bmi_imputed: bool | None = None
+    reported_symptoms: list[str] | None = None
 
 
 class ChatRequest(BaseModel):
@@ -130,11 +170,9 @@ def chat(message: ChatRequest):
     return ChatResponse(response=text.strip())
 
 
-@app.post("/predict-pcos", response_model=Prediction, status_code=201)
-def predict_pcos(
-    survey: SurveyData,
+def authenticated_client(
     request: Request,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    credentials: HTTPAuthorizationCredentials | None,
 ):
     if credentials is None:
         raise HTTPException(401, "A Supabase access token is required.", headers={"WWW-Authenticate": "Bearer"})
@@ -154,6 +192,33 @@ def predict_pcos(
         raise HTTPException(503, "Authentication is temporarily unavailable.") from None
     if auth is None or auth.user is None:
         raise HTTPException(401, "Invalid or expired access token.")
+    return client, auth
+
+
+@app.post('/pcos/model-assessment', response_model=ModelQuizResult,
+          response_model_exclude_none=True)
+def model_assessment(
+    answers: ModelQuizData,
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+):
+    authenticated_client(request, credentials)
+    try:
+        return pcos_model.assess(answers.model_dump(), request.app.state.pcos_model)
+    except ValueError:
+        raise HTTPException(422, 'Inputs do not match the model contract.') from None
+    except Exception:
+        raise HTTPException(503, 'The experimental model is temporarily unavailable. Your answers can be retried.') from None
+
+
+@app.post("/predict-pcos", response_model=Prediction, status_code=201)
+def predict_pcos(
+    survey: SurveyData,
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+):
+    client, auth = authenticated_client(request, credentials)
+    token = credentials.credentials
     client.postgrest.auth(token)
 
     answers = survey.model_dump()

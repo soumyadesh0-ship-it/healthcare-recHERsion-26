@@ -1,5 +1,10 @@
 # Auracare mobile demo
 
+PCOS flashcards and real Random Forest serving through the shared FastAPI:
+[integration, local USB setup and validation](../../docs/PCOS_MODEL_INTEGRATION.md).
+Signed-in quiz submission uses the configurable API URL and current Supabase
+token; demo mode remains an explicitly offline fixture flow.
+
 Current game, spotting/discharge and fictional directory: [implementation and verification](../../docs/AURACARE_UNWIND_TRACKING.md). No new dependencies. Health/game state remains session-only.
 
 Phase 3 features, data handling, sources and verification: [Cycle estimates, Doctor and Learn](../../docs/AURACARE_PHASE3.md). Doctor appointments now persist in app-private Android storage; the original health records remain session-only.
@@ -12,7 +17,7 @@ Implemented: original flat geometric characters, white/pastel UI, welcome screen
 
 ## Run
 
-Generated and checked with Flutter **3.47.8**, Dart **3.13.7**. The generated SDK constraint is preserved in pubspec.yaml; no packages were downgraded. Runtime dependencies include Flutter and the official Supabase Flutter client; `http` is used only by isolated auth adapter tests.
+Generated and checked with Flutter **3.47.8**, Dart **3.13.7**. The generated SDK constraint is preserved in pubspec.yaml; no packages were downgraded. Runtime dependencies include Flutter, the official Supabase Flutter client, and `http` for authenticated PCOS model requests.
 
 From this folder, with the Flutter SDK on PATH and an Android/iOS development device ready:
 
@@ -96,6 +101,10 @@ Output: ignored `build/previews/` PNGs at 320/390/430 logical pixels, normal/200
 
 Timezones: device-local wall clock or explicit UTC for new entries. Existing dates retain their original label/components; no IANA conversion is claimed. Mild/Moderate/Severe/Unspecified is a prototype scale. Journals start excluded from appointment selection. Clipboard copies leave the session and are not erased by reset.
 
-Quiz keys follow the supplied brief, not a verified local model contract. Unknown answers stay null; known diagnosis routes to tracking. Demo fixtures run no model and show no risk band/percentage. Replace the service only after contract/privacy/safety validation; no speculative endpoint is configured.
+Quiz keys match `auracare_pcos/quiz_contract.json`. Unknown answers stay null;
+known diagnosis routes to tracking. Signed-in submissions use the separate
+`/pcos/model-assessment` endpoint with configurable `AURACARE_API_BASE_URL`.
+Demo fixtures run no model. Neither mode displays clinical risk bands or personal
+PCOS probabilities. See the integration guide above for exact local and HTTPS setup.
 
 See [Mobile UI handoff](../../docs/MOBILE_UI_HANDOFF.md) for the audit, scope checklist, command results, overrides and remaining integration work.

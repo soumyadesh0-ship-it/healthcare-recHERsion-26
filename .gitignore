@@ -43,6 +43,9 @@
 
 # Temporary logs, editor swap files and caches
 **/*.log
+.venv-pcos/
+**/__pycache__/
+**/.kotlin/
 **/*.swp
 **/*.swo
 **/.cache/

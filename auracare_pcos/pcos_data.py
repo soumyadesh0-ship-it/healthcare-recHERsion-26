@@ -28,6 +28,9 @@ def fingerprints(frame, columns):
 
 def prepare_survey(path):
     raw = pd.read_csv(path)
+    # Git on Windows may convert newlines inside quoted CSV column headings.
+    # Canonicalize headings only; never rewrite input values or source files.
+    raw.columns = raw.columns.str.replace('\r\n', '\n', regex=False)
     audit = {'original_rows': len(raw), 'exact_duplicate_rows_removed': int(raw.duplicated().sum())}
     frame = raw.drop_duplicates().rename(columns=SURVEY_COLUMNS).copy()
     for col in SURVEY_COLUMNS.values():

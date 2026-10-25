@@ -227,12 +227,20 @@ void main() {
       await tapText(tester, 'Next');
       expect(
         tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Not sure'))
+            .widget<Semantics>(
+              find
+                  .ancestor(
+                    of: find.byKey(const ValueKey('answer-Not sure')),
+                    matching: find.byType(Semantics),
+                  )
+                  .first,
+            )
+            .properties
             .selected,
         isTrue,
       );
       for (var i = 0; i < 6; i++) {
-        await tapText(tester, 'Next');
+        await tapText(tester, i == 5 ? 'Review' : 'Next');
       }
       await tapText(tester, 'Submit demo answers');
       expect(find.text('Insufficient inputs'), findsOneWidget);
@@ -365,7 +373,7 @@ void main() {
       tester.testTextInput.hide();
       await tester.pumpAndSettle();
       for (var i = 0; i < 7; i++) {
-        await tapText(tester, 'Next');
+        await tapText(tester, i == 6 ? 'Review' : 'Next');
       }
       await tapText(tester, 'Submit demo answers');
       expect(find.text('Outside experimental age scope'), findsOneWidget);

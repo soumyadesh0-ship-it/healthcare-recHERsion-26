@@ -18,4 +18,7 @@ python -m unittest -v
 The models are already trained. To reproduce training: `python train.py`.
 Open `Auracare_PCOS_Colab.ipynb` in Colab if preferred. It prompts you to upload this ZIP.
 Use only trusted joblib files. Keep `data/raw`, predictions, and health records private.
-This package is not integrated into Flutter and is not a clinical diagnostic tool.
+The existing fitted model is now served through the shared FastAPI endpoint
+`POST /pcos/model-assessment`, used by signed-in Flutter quiz submissions.
+See [integration and local setup](../docs/PCOS_MODEL_INTEGRATION.md). The original
+artifact remains unchanged; this is not a clinical diagnostic tool.

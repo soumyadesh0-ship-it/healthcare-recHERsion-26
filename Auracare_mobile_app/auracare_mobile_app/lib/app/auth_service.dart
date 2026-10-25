@@ -19,6 +19,11 @@ abstract interface class AuthService {
   Future<void> signOut();
 }
 
+/// Separate capability so demo/custom auth providers never fabricate a token.
+abstract interface class AccessTokenProvider {
+  Future<String?> accessToken();
+}
+
 class AuthUser {
   const AuthUser({required this.id, this.email, this.displayName});
 

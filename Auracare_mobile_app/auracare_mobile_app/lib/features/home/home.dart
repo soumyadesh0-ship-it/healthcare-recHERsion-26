@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/session.dart';
+import '../../app/quiz_integration.dart';
 import '../../app/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/records.dart';
@@ -75,7 +76,9 @@ class HomePage extends StatelessWidget {
         ActionCard(
           title: 'PCOS quiz',
           color: Palette.yellow,
-          subtitle: 'Experimental questionnaire demo',
+          subtitle: QuizIntegrationScope.maybeOf(context)?.signedIn == true
+              ? 'Experimental questionnaire'
+              : 'Experimental questionnaire demo',
           icon: Icons.assignment_outlined,
           onTap: () => pushPage(context, const QuizPage()),
         ),
