@@ -50,7 +50,7 @@ class MainActivity : FlutterActivity() {
                 if (call.method != "open") { result.notImplemented() } else {
                     try {
                         val uri = Uri.parse(call.arguments as String)
-                        require(uri.scheme == "https" && uri.host in setOf("www.nhs.uk", "www.who.int", "www.cdc.gov", "health.nih.gov"))
+                        require(uri.scheme == "https" && uri.host in setOf("www.nhs.uk", "www.who.int", "www.cdc.gov", "health.nih.gov", "www.fda.gov", "www.monash.edu"))
                         startActivity(Intent(Intent.ACTION_VIEW, uri))
                         result.success(true)
                     } catch (_: Exception) { result.success(false) }

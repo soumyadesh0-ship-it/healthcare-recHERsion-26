@@ -2,11 +2,48 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
-enum EntryType { symptom, journal, bleeding, wellness }
+enum EntryType { symptom, journal, bleeding, wellness, spotting, discharge }
+
+enum TrackingAmount { light, moderate, heavy }
+
+enum ObservationAnswer { yes, no, unsure }
+
+String observationLabel(Enum value) =>
+    '${value.name[0].toUpperCase()}${value.name.substring(1)}';
+
+@immutable
+class TrackingDetails {
+  const TrackingDetails({
+    required this.amount,
+    this.color,
+    this.consistency,
+    this.odorChange,
+    this.irritation,
+  });
+  final TrackingAmount amount;
+  final String? color, consistency;
+  final ObservationAnswer? odorChange, irritation;
+  String get summary => [
+    'Amount: ${observationLabel(amount)}',
+    if (color != null && color!.isNotEmpty) 'Color: $color',
+    if (consistency != null && consistency!.isNotEmpty)
+      'Consistency: $consistency',
+    if (odorChange != null) 'Odor change: ${observationLabel(odorChange!)}',
+    if (irritation != null)
+      'Itching/irritation: ${observationLabel(irritation!)}',
+  ].join(' · ');
+  Map<String, Object?> toJson() => {
+    'amount': amount.name,
+    if (color != null) 'color': color,
+    if (consistency != null) 'consistency': consistency,
+    if (odorChange != null) 'odorChange': odorChange!.name,
+    if (irritation != null) 'irritation': irritation!.name,
+  };
+}
 
 enum Severity { unspecified, mild, moderate, severe }
 
-enum FlowIntensity { unspecified, light, moderate, heavy }
+enum FlowIntensity { unspecified, spotting, light, moderate, heavy }
 
 enum RecordedMood {
   happy,
@@ -43,6 +80,7 @@ class HealthEntry {
     this.savedAt,
     this.periodStart,
     this.periodEnd,
+    this.tracking,
   });
   final String id, title, note, zone;
   final EntryType type;
@@ -54,11 +92,13 @@ class HealthEntry {
   /// Successful save time, separate from the observation's calendar date.
   final DateTime? savedAt;
   final bool? periodStart, periodEnd;
+  final TrackingDetails? tracking;
 
   FlowIntensity? get flowIntensity {
     if (type != EntryType.bleeding) return null;
     // The original form already saves intensity in these exact titles.
     return switch (title) {
+      'Bleeding · Spotting' => FlowIntensity.spotting,
       'Bleeding · Light' => FlowIntensity.light,
       'Bleeding · Moderate' => FlowIntensity.moderate,
       'Bleeding · Heavy' => FlowIntensity.heavy,
@@ -89,6 +129,7 @@ class HealthEntry {
     savedAt: timestamp,
     periodStart: periodStart,
     periodEnd: periodEnd,
+    tracking: tracking,
   );
   Map<String, Object?> toJson() => {
     'id': id,
@@ -103,9 +144,11 @@ class HealthEntry {
     if (savedAt != null) 'savedAt': savedAt!.toIso8601String(),
     if (periodStart != null) 'periodStart': periodStart,
     if (periodEnd != null) 'periodEnd': periodEnd,
+    if (tracking != null) 'tracking': tracking!.toJson(),
   };
   String get description =>
       '${dayLabel(when)} ${timeLabel(when)} · $zone\n$title · ${type.name}'
+      '${tracking == null ? '' : '\n${tracking!.summary}'}'
       '${severity == Severity.unspecified ? '' : ' · ${severity.name}'}${note.isEmpty ? '' : '\n$note'}';
 }
 
@@ -160,6 +203,10 @@ class DemoRecordsRepository extends RecordsRepository {
     if (entry.note.length > 2000 || entry.title.trim().isEmpty) {
       throw ArgumentError('Check the title and note length.');
     }
+    if ((entry.tracking?.color?.length ?? 0) > 80 ||
+        (entry.tracking?.consistency?.length ?? 0) > 80) {
+      throw ArgumentError('Check the observation field lengths.');
+    }
     final index = _entries.indexWhere((e) => e.id == entry.id);
     if (index >= 0) {
       if (entry.version != _entries[index].version + 1) {
@@ -167,6 +214,16 @@ class DemoRecordsRepository extends RecordsRepository {
       }
       _entries[index] = entry.savedOn(DateTime.now().toUtc());
     } else {
+      if (entry.type == EntryType.bleeding &&
+          _entries.any(
+            (e) =>
+                e.type == EntryType.bleeding &&
+                dayLabel(e.when) == dayLabel(entry.when),
+          )) {
+        throw StateError(
+          'A flow entry already exists for this date. Reopen it to edit.',
+        );
+      }
       _entries.add(entry.savedOn(DateTime.now().toUtc()));
     }
     notifyListeners();

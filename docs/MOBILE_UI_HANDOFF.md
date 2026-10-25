@@ -1,5 +1,7 @@
 # Mobile UI handoff
 
+> Current update (25 October 2026): [Five-tab navigation, wellbeing, logging and PCOS quiz](AURACARE_NAV_WELLBEING_UPDATE.md) supersedes the historical UI descriptions below. It documents recovered source at main `74c1661`, unchanged approved logo assets, model compatibility, native changes and actual validation.
+
 ## Audit and authority (2026-10-25)
 
 Inspected local branch `md_modification`, commit `19ef623`; initial working tree clean. Read all 16 existing project Markdown files completely. No applicable repository/ancestor AGENTS.md found. The only non-document project artifact was the tracked PowerShell cache, left untouched. No archives, images, Flutter/native README, pubspec, lib, tests, assets, lockfile, quiz_contract.json, predict.py, model or backend existed locally. The remote snapshot described in the brief is not this checkout. No reference images were supplied; the visual implementation follows the written brief, not a claimed image match.

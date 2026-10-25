@@ -32,12 +32,12 @@ class PreviewResourcesRepository implements ResourcesRepository {
 }
 
 const quizFields = <String, String>{
-  'regular_periods': 'Are periods regular?',
-  'weight_gain': 'Weight gain?',
-  'excess_hair': 'Excess hair growth?',
-  'skin_darkening': 'Skin darkening?',
-  'hair_thinning': 'Hair thinning?',
-  'acne': 'Acne?',
+  'regular_periods': 'Are your periods regular?',
+  'weight_gain': 'Have you gained weight recently?',
+  'excess_hair': 'Do you have excessive body or facial hair growth?',
+  'skin_darkening': 'Are you noticing skin darkening recently?',
+  'hair_thinning': 'Do you have scalp hair loss or thinning?',
+  'acne': 'Do you have pimples or acne on your face or jawline?',
 };
 
 class QuizAnswers {
@@ -56,6 +56,15 @@ class QuizAnswers {
     ...binary,
     'known_pcos_diagnosis': knownDiagnosis,
   };
+
+  /// predict.py accepts an omitted routing flag but rejects an explicit null.
+  /// Unknown stays null in the UI/export; omission never asserts a diagnosis.
+  Map<String, Object?> toModelJson() {
+    final payload = toJson();
+    if (knownDiagnosis == null) payload.remove('known_pcos_diagnosis');
+    return payload;
+  }
+
   String get summary =>
       'Experimental questionnaire — synthetic demo\n'
       'No model was run. Cannot diagnose or rule out PCOS.\n'
@@ -91,7 +100,7 @@ class DemoQuizService implements QuizService {
     if (answers.knownDiagnosis == true) return QuizOutcome.tracking;
     if (answers.age == null) return QuizOutcome.insufficient;
     if (answers.age! < 18 || answers.age! > 45) return QuizOutcome.outsideScope;
-    // Prototype gate, not a verified model minimum-input rule. Null stays null.
+    // experimental-1 contract: all six binary features required; BMI nullable.
     if (answers.binary.values.any((v) => v == null)) {
       return QuizOutcome.insufficient;
     }
@@ -117,6 +126,7 @@ String appointmentSummary(
       .map(
         (e) =>
             '${dayLabel(e.when)} ${timeLabel(e.when)} (${e.zone}) — ${e.title} [${e.type.name}, v${e.version}]'
+            '${e.tracking == null ? '' : '\n${e.tracking!.summary}'}'
             '${includeNotes && e.note.isNotEmpty ? '\n${e.note}' : ''}',
       )
       .join('\n\n');

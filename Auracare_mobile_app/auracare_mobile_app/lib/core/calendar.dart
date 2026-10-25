@@ -19,8 +19,11 @@ Color eventColor(EntryType type) => switch (type) {
   EntryType.symptom => Palette.yellow,
   EntryType.wellness => Palette.turquoise,
   EntryType.journal => Palette.periwinkle,
+  EntryType.spotting => Palette.orchid,
+  EntryType.discharge => Palette.apricot,
 };
 Color flowColor(FlowIntensity intensity) => switch (intensity) {
+  FlowIntensity.spotting => Palette.blush,
   FlowIntensity.light => Palette.lightFlow,
   FlowIntensity.moderate => Palette.moderateFlow,
   FlowIntensity.heavy => Palette.heavyFlow,
@@ -35,8 +38,9 @@ Color moodColor(RecordedMood mood) => switch (mood) {
   RecordedMood.energetic => Palette.pink,
 };
 String flowLabel(FlowIntensity intensity) => switch (intensity) {
+  FlowIntensity.spotting => 'Spotting',
   FlowIntensity.light => 'Light flow',
-  FlowIntensity.moderate => 'Moderate flow',
+  FlowIntensity.moderate => 'Medium flow',
   FlowIntensity.heavy => 'Heavy flow',
   FlowIntensity.unspecified => 'Unspecified period',
 };
@@ -142,6 +146,7 @@ class _RecordCalendarState extends State<RecordCalendar> {
                 ? 336 * scale
                 : constraints.maxWidth;
             return SingleChildScrollView(
+              key: const PageStorageKey('record-calendar-horizontal-scroll'),
               scrollDirection: Axis.horizontal,
               child: SizedBox(
                 width: width,
@@ -223,65 +228,87 @@ class _RecordCalendarState extends State<RecordCalendar> {
                                         width: 2,
                                       ),
                                     ),
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(14),
-                                      onTap: () => widget.onSelect(date),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            '$number',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: flow == FlowIntensity.heavy
-                                                  ? Palette.flowInk
-                                                  : Palette.ink,
-                                              fontWeight: active
-                                                  ? FontWeight.w800
-                                                  : FontWeight.w400,
-                                              decoration: active
-                                                  ? TextDecoration.underline
-                                                  : null,
-                                              decorationColor: Palette.action,
-                                              decorationThickness: 2,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          if (estimate != null)
-                                            Container(
-                                              key: ValueKey(
-                                                'estimate-${dayLabel(date)}',
+                                    child: Ink(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(14),
+                                        gradient: flow == null
+                                            ? null
+                                            : LinearGradient(
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                                colors: [
+                                                  Color.lerp(
+                                                    Palette.white,
+                                                    flowColor(flow),
+                                                    .55,
+                                                  )!,
+                                                  flowColor(flow),
+                                                ],
                                               ),
-                                              width: 8,
-                                              height: 4,
-                                              decoration: BoxDecoration(
-                                                color: phaseColor(estimate),
-                                                border: Border.all(
-                                                  color: Palette.action,
+                                      ),
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(14),
+                                        onTap: () => widget.onSelect(date),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              '$number',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color:
+                                                    flow == FlowIntensity.heavy
+                                                    ? Palette.flowInk
+                                                    : Palette.ink,
+                                                fontWeight: active
+                                                    ? FontWeight.w800
+                                                    : FontWeight.w400,
+                                                decoration: active
+                                                    ? TextDecoration.underline
+                                                    : null,
+                                                decorationColor: Palette.action,
+                                                decorationThickness: 2,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            if (estimate != null)
+                                              Container(
+                                                key: ValueKey(
+                                                  'estimate-${dayLabel(date)}',
                                                 ),
-                                              ),
-                                            ),
-                                          Wrap(
-                                            spacing: 2,
-                                            children: [
-                                              for (final type in events.where(
-                                                (t) =>
-                                                    t != EntryType.bleeding &&
-                                                    (t != EntryType.wellness ||
-                                                        mood == null),
-                                              ))
-                                                Container(
-                                                  width: 5,
-                                                  height: 5,
-                                                  decoration: BoxDecoration(
-                                                    color: eventColor(type),
-                                                    shape: BoxShape.circle,
+                                                width: 8,
+                                                height: 4,
+                                                decoration: BoxDecoration(
+                                                  color: phaseColor(estimate),
+                                                  border: Border.all(
+                                                    color: Palette.action,
                                                   ),
                                                 ),
-                                            ],
-                                          ),
-                                        ],
+                                              ),
+                                            Wrap(
+                                              spacing: 2,
+                                              children: [
+                                                for (final type in events.where(
+                                                  (t) =>
+                                                      t != EntryType.bleeding &&
+                                                      (t !=
+                                                              EntryType
+                                                                  .wellness ||
+                                                          mood == null),
+                                                ))
+                                                  Container(
+                                                    width: 5,
+                                                    height: 5,
+                                                    decoration: BoxDecoration(
+                                                      color: eventColor(type),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -330,6 +357,8 @@ class _RecordCalendarState extends State<RecordCalendar> {
           style: Theme.of(context).textTheme.bodySmall,
         ),
         ExpansionTile(
+          // Keep the boolean expansion state separate from ancestor scroll offsets.
+          key: const PageStorageKey('record-calendar-mood-legend'),
           tilePadding: EdgeInsets.zero,
           dense: true,
           title: Text(

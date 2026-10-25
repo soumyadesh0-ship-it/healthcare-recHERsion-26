@@ -62,6 +62,44 @@ Future<void> tapText(WidgetTester tester, String text) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> tapTab(WidgetTester tester, String label) async {
+  final target = find.byKey(ValueKey('tab-$label'));
+  await tester.ensureVisible(target);
+  await tester.pumpAndSettle();
+  await tester.tap(target);
+  await tester.pumpAndSettle();
+}
+
+Future<void> drawerPage(WidgetTester tester, String label) async {
+  await tester.tap(find.byKey(const ValueKey('open-drawer')));
+  await tester.pumpAndSettle();
+  await tapText(tester, label);
+}
+
+Future<void> fillQuiz(WidgetTester tester, {bool unknown = false}) async {
+  await tapText(tester, 'Begin questionnaire');
+  await tapText(tester, 'No');
+  await tapText(tester, 'Continue');
+  await tester.enterText(find.byType(TextFormField), '28');
+  tester.testTextInput.hide();
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tapText(tester, 'Continue');
+  await tapText(tester, 'Continue'); // optional BMI remains null
+  for (var i = 0; i < 6; i++) {
+    await tapText(tester, unknown && i == 0 ? 'Not sure' : 'No');
+    await tapText(tester, 'Continue');
+  }
+}
+
+class FailingQuizService implements QuizService {
+  int calls = 0;
+  @override
+  Future<QuizOutcome> assess(QuizAnswers answers) async {
+    calls++;
+    throw StateError('offline');
+  }
+}
+
 void main() {
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -78,43 +116,39 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(AndroidAppointmentStore.channel, null);
   });
-  testWidgets('onboarding skip/demo entry and six tabs preserve search state', (
+  testWidgets('onboarding and five destinations preserve tab state', (
     tester,
   ) async {
     await tester.pumpWidget(const AuracareApp());
     await tester.pumpAndSettle();
     await tapText(tester, 'Get started');
     expect(find.text('Your body. Your rhythm. Your space.'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('Next'));
-    await tester.pumpAndSettle();
-    await tapText(tester, 'Back');
     await tapText(tester, 'Skip');
     await tapText(tester, 'Start empty demo');
-    expect(find.text('Demo — sample data'), findsOneWidget);
     for (final tab in [
-      'Timeline',
-      'Learn',
-      'Insights',
-      'Doctor',
-      'Profile',
       'Home',
+      'Wellbeing',
+      'Doctor',
+      'Timeline',
+      'PCOS Quiz',
     ]) {
-      await tester.tap(find.byKey(ValueKey('tab-$tab')));
-      await tester.pumpAndSettle();
+      await tapTab(tester, tab);
     }
-    await tester.tap(find.byKey(const ValueKey('tab-Learn')));
-    await tester.pumpAndSettle();
+    await tapText(tester, 'Begin questionnaire');
+    await tapTab(tester, 'Home');
+    await tapTab(tester, 'PCOS Quiz');
+    expect(find.text('Question 1 of 9'), findsOneWidget);
+    await tapTab(tester, 'Home');
+    await drawerPage(tester, 'Learn');
     await tester.enterText(
       find.byKey(const ValueKey('resource-search')),
       'no topic matches',
     );
     await tester.pumpAndSettle();
     expect(find.text('No matching topics'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('tab-Home')));
+    await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('tab-Learn')));
-    await tester.pumpAndSettle();
-    expect(find.text('no topic matches'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
   });
   testWidgets(
     'journal validation, failure retry preserves text and propagates save',
@@ -213,25 +247,23 @@ void main() {
     },
   );
   testWidgets(
-    'quiz back/edit preserves unknown answer and insufficient state',
+    'quiz back/edit preserves unknown answers and insufficient result',
     (tester) async {
-      final session = DemoSession();
-      await show(tester, const QuizPage(), session);
-      await tapText(tester, 'Load explicit synthetic example');
-      await tapText(tester, 'Are periods regular?');
-      await tapText(tester, 'Not sure');
-      await tapText(tester, 'Back');
-      await tapText(tester, 'Next');
+      await show(tester, const QuizPage(), DemoSession());
+      await fillQuiz(tester, unknown: true);
+      await tapText(tester, 'Are your periods regular?');
       expect(
         tester
             .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Not sure'))
             .selected,
         isTrue,
       );
+      await tapText(tester, 'Back');
+      await tapText(tester, 'Continue');
       for (var i = 0; i < 6; i++) {
-        await tapText(tester, 'Next');
+        await tapText(tester, 'Continue');
       }
-      await tapText(tester, 'Submit demo answers');
+      await tapText(tester, 'Submit answers');
       expect(find.text('Insufficient inputs'), findsOneWidget);
     },
   );
@@ -280,7 +312,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Fatigue'), findsOneWidget);
     expect(find.text('Headache'), findsNothing);
-    await tester.tap(find.byKey(const ValueKey('tab-Insights')));
+    await drawerPage(tester, 'Insights');
     await tester.pumpAndSettle();
     await tapText(
       tester,
@@ -288,8 +320,9 @@ void main() {
     );
     await tester.runAsync(() => session.records.delete(entry.id));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('tab-Timeline')));
+    await tester.pageBack();
     await tester.pumpAndSettle();
+    await tapTab(tester, 'Timeline');
     expect(find.text('No records yet'), findsOneWidget);
   });
   testWidgets(
@@ -318,65 +351,62 @@ void main() {
     await tapText(tester, 'Delete');
     expect(session.records.entries, hasLength(2));
   });
-  for (final scenario in [QuizOutcome.failure, QuizOutcome.unavailable]) {
+  for (final failure in [true, false]) {
     testWidgets(
-      'quiz ${scenario.name} preserves answers and offers honest retry',
+      'quiz service ${failure ? 'failure' : 'unavailable'} preserves answers and retries',
       (tester) async {
-        await show(tester, const QuizPage(), DemoSession());
-        await tapText(tester, 'Load explicit synthetic example');
-        await tapText(tester, 'Labeled fixture (no model)');
-        await tapText(
+        final service = FailingQuizService();
+        await show(
           tester,
-          scenario == QuizOutcome.failure
-              ? 'Fail once, then retry fixture'
-              : 'Live service unavailable',
+          QuizPage(service: failure ? service : null),
+          DemoSession(),
         );
-        await tapText(tester, 'Submit demo answers');
+        await fillQuiz(tester);
+        await tapText(tester, 'Submit answers');
         expect(
           find.text(
-            scenario == QuizOutcome.failure
-                ? 'Demo service failed'
+            failure
+                ? 'Assessment could not be reached'
                 : 'Live assessment unavailable',
           ),
           findsOneWidget,
         );
-        await tapText(tester, 'Retry demo service');
+        await tapText(tester, 'Retry assessment');
         expect(
           find.text(
-            scenario == QuizOutcome.failure
-                ? 'A summary, not a diagnosis.'
+            failure
+                ? 'Assessment could not be reached'
                 : 'Live assessment unavailable',
           ),
           findsOneWidget,
         );
+        if (failure) expect(service.calls, 2);
       },
     );
   }
   testWidgets(
-    'quiz age scope leaves rest of app available, known diagnosis avoids scoring',
+    'quiz known diagnosis skips service; age scope remains enforced',
     (tester) async {
-      await show(tester, const QuizPage(), DemoSession());
-      await tapText(tester, 'Load explicit synthetic example');
-      await tapText(tester, 'Edit context');
-      await tester.enterText(find.byType(TextFormField).first, '17');
-      tester.testTextInput.hide();
-      await tester.pumpAndSettle();
-      for (var i = 0; i < 7; i++) {
-        await tapText(tester, 'Next');
-      }
-      await tapText(tester, 'Submit demo answers');
-      expect(find.text('Outside experimental age scope'), findsOneWidget);
+      final service = FailingQuizService();
+      await show(tester, QuizPage(service: service), DemoSession());
+      await tapText(tester, 'Begin questionnaire');
+      await tapText(tester, 'Yes');
+      await tapText(tester, 'Continue');
+      expect(find.text('Continue with your history'), findsOneWidget);
+      expect(service.calls, 0);
       await tapText(tester, 'Edit answers');
       await tapText(tester, 'Edit context');
-      await tapText(tester, 'Yes');
-      await tapText(tester, 'Next');
-      expect(find.text('Continue with your history'), findsOneWidget);
-      await tapText(tester, 'Return to Auracare');
-      expect(find.text('Open test page'), findsOneWidget);
+      await tapText(tester, 'No');
+      await tapText(tester, 'Continue');
+      await tester.enterText(find.byType(TextFormField), '17');
+      tester.testTextInput.hide();
+      await tapText(tester, 'Continue');
+      expect(find.text('Outside experimental age scope'), findsOneWidget);
+      expect(service.calls, 0);
     },
   );
   for (final width in [320.0, 390.0, 430.0]) {
-    testWidgets('six destinations at width $width and text scale 200%', (
+    testWidgets('five destinations at width $width and text scale 200%', (
       tester,
     ) async {
       tester.view.physicalSize = Size(width, 1000);
@@ -392,12 +422,11 @@ void main() {
       for (final tab in [
         'Home',
         'Timeline',
-        'Learn',
-        'Insights',
+        'Wellbeing',
         'Doctor',
-        'Profile',
+        'PCOS Quiz',
       ]) {
-        await tester.tap(find.byKey(ValueKey('tab-$tab')));
+        await tapTab(tester, tab);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'Active tab: $tab');
       }

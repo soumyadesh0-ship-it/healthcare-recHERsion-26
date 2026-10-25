@@ -102,26 +102,37 @@ double demoBadgeHeight(BuildContext context) {
 }
 
 class PageFrame extends StatelessWidget {
-  const PageFrame({super.key, required this.title, required this.children});
+  const PageFrame({
+    super.key,
+    required this.title,
+    required this.children,
+    this.embedded = false,
+  });
   final String title;
   final List<Widget> children;
+  final bool embedded;
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(title),
-      bottom: PreferredSize(
-        preferredSize: Size.fromHeight(demoBadgeHeight(context)),
-        child: DemoBadge(),
-      ),
-    ),
-    body: SafeArea(
-      top: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        children: spaced(children),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => embedded
+      ? ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          children: spaced(children),
+        )
+      : Scaffold(
+          appBar: AppBar(
+            title: Text(title),
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(demoBadgeHeight(context)),
+              child: DemoBadge(),
+            ),
+          ),
+          body: SafeArea(
+            top: false,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              children: spaced(children),
+            ),
+          ),
+        );
 }
 
 List<Widget> spaced(List<Widget> items, {double gap = 16}) => [
@@ -242,6 +253,8 @@ class ActionCard extends StatelessWidget {
 IconData entryIcon(EntryType type) => switch (type) {
   EntryType.symptom => Icons.waves_outlined,
   EntryType.journal => Icons.edit_note,
+  EntryType.spotting => Icons.grain,
+  EntryType.discharge => Icons.opacity_outlined,
   EntryType.bleeding => Icons.water_drop_outlined,
   EntryType.wellness => Icons.spa_outlined,
 };
@@ -253,7 +266,8 @@ class EntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ActionCard(
     title: entry.title,
-    subtitle: '${timeLabel(entry.when)} · ${entry.type.name}\n${entry.zone}',
+    subtitle:
+        '${entry.tracking == null ? '' : '${entry.tracking!.summary}\n'}${timeLabel(entry.when)} · ${entry.type.name}\n${entry.zone}',
     icon: entryIcon(entry.type),
     onTap: onTap,
   );

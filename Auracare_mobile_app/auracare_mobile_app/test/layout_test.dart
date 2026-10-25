@@ -206,8 +206,11 @@ void main() {
               type: EntryType.symptom,
               key: ValueKey('symptom'),
             ),
-            'symptom_keyboard',
-            keyboard: true,
+            'symptom_form',
+          );
+          await frame(
+            const EntryEditor(type: EntryType.bleeding),
+            'period_inline',
           );
           await frame(const QuizPage(), 'quiz_intro');
           await tester.pumpWidget(const SizedBox.shrink());

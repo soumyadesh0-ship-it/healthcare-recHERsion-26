@@ -1,5 +1,7 @@
 # Auracare mobile demo
 
+Latest implemented UI and validation: [Navigation, wellbeing, logging and nine-step quiz](../../docs/AURACARE_NAV_WELLBEING_UPDATE.md). Bottom navigation is Home / Wellbeing / Doctor / Timeline / PCOS Quiz; Profile, Learn and Insights are in the logo drawer. The experimental model endpoint remains unavailable.
+
 Phase 3 features, data handling, sources and verification: [Cycle estimates, Doctor and Learn](../../docs/AURACARE_PHASE3.md). Doctor appointments now persist in app-private Android storage; the original health records remain session-only.
 
 Current UI refinements, logo assets, changed files and device/test results: [AuraCare refinement](../../docs/AURACARE_REFINEMENT.md).

@@ -6,6 +6,10 @@ import 'setup_preference.dart';
 import '../data/records.dart';
 import 'theme.dart';
 import 'shell.dart';
+import 'navigation.dart';
+import '../features/profile/profile.dart';
+import '../features/learn/learn.dart';
+import '../features/insights/insights.dart';
 import '../features/onboarding/onboarding.dart';
 
 class AuracareApp extends StatefulWidget {
@@ -70,8 +74,32 @@ class _AuracareAppState extends State<AuracareApp> {
       listenable: session,
       builder: (context, _) => MaterialApp(
         title: 'AuraCare',
+        navigatorObservers: [auraRouteObserver],
         debugShowCheckedModeBanner: false,
         theme: auracareTheme(),
+        onGenerateRoute: (settings) {
+          final destination = AppDestination.fromRoute(settings.name);
+          if (destination == null) {
+            final page = switch (settings.name) {
+              '/app/profile' => const ProfilePage(),
+              '/app/learn' => const LearnPage(),
+              '/app/insights' => const InsightsPage(),
+              _ => null,
+            };
+            if (page == null) return null;
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => Scaffold(
+                appBar: AppBar(title: const Text('auracare')),
+                body: SafeArea(child: page),
+              ),
+            );
+          }
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => AppShell(initialDestination: destination),
+          );
+        },
         routes: kDebugMode
             ? {
                 '/debug/onboarding': (context) =>

@@ -7,6 +7,7 @@ import '../../data/records.dart';
 import '../../data/cycles.dart';
 import '../logging/editor.dart';
 import '../cycle/cycle.dart';
+import '../logging/period_picker.dart';
 
 class TimelineScreen extends StatelessWidget {
   const TimelineScreen({super.key});
@@ -106,8 +107,10 @@ class _TimelinePageState extends State<TimelinePage> {
             entries: all,
             estimates: session.showCycleEstimates ? estimates : null,
             selected: range?.start,
-            onSelect: (day) =>
-                setState(() => range = DateTimeRange(start: day, end: day)),
+            onSelect: (day) {
+              setState(() => range = DateTimeRange(start: day, end: day));
+              openPeriodDay(context, day);
+            },
           ),
         if (widget.onlyType == null)
           Wrap(

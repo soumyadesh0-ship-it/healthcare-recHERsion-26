@@ -224,8 +224,8 @@ class WelcomeSplash extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(28),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,14 +233,12 @@ class WelcomeSplash extends StatelessWidget {
                       const SizedBox(height: 48),
                       const Center(child: AuraLogo(width: 230)),
                       const SizedBox(height: 16),
-                      const Text('A kinder way to understand your body.'),
                     ],
                   ),
                   const SizedBox(height: 40),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Center(child: CharacterCluster()),
                       const SizedBox(height: 28),
                       FilledButton(
                         onPressed: onContinue,

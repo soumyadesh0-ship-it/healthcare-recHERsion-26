@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 abstract final class Palette {
   static const purple = Color(0xFFB49AD6);
   static const white = Color(0xFFFFFFFF);
-  static const lavender = Color(0xFFE8DEF2);
+  static const lavender = Color(0xFFE7DEF1);
   static const pink = Color(0xFFEFA8C5);
-  static const blush = Color(0xFFF9DFE9);
+  static const blush = Color(0xFFF9DFEA);
   static const yellow = Color(0xFFF6D794);
   static const coral = Color(0xFFE99A8B);
   static const turquoise = Color(0xFF89CECA);
-  static const blue = Color(0xFFA6BCE0);
+  static const blue = Color(0xFFA6BCE1);
   static const periwinkle = blue;
   static const ink = Color(0xFF34283D);
   static const flowInk = Color(0xFF24192C);

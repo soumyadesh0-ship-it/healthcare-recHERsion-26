@@ -1,3 +1,5 @@
+import 'widget_test.dart' as helper;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:auracare_mobile_app/app/app.dart';
@@ -270,7 +272,7 @@ void main() {
     session.dispose();
   });
   testWidgets(
-    'six tabs preserve Profile and Doctor preparation without a header profile button',
+    'five tabs preserve Doctor preparation; Profile is available in drawer',
     (tester) async {
       final repo = AppointmentsRepository(store: TestAppointmentStore());
       final session = DemoSession(appointments: repo);
@@ -282,13 +284,12 @@ void main() {
       for (final tab in [
         'Home',
         'Timeline',
-        'Learn',
-        'Insights',
+        'Wellbeing',
         'Doctor',
-        'Profile',
+        'PCOS Quiz',
       ]) {
         expect(find.byKey(ValueKey('tab-$tab')), findsOneWidget);
-        await tester.tap(find.byKey(ValueKey('tab-$tab')));
+        await helper.tapTab(tester, tab);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       }
@@ -309,7 +310,7 @@ void main() {
       AuracareApp(session: session, showOnboarding: false),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('tab-Learn')));
+    await helper.drawerPage(tester, 'Learn');
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('resource-search')),

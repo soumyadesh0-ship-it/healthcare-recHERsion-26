@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'theme.dart';
 import 'session.dart';
+import 'theme.dart';
+import '../core/brand.dart';
 import '../core/widgets.dart';
 import '../features/home/home.dart';
 import '../features/timeline/timeline.dart';
@@ -9,159 +10,297 @@ import '../features/learn/learn.dart';
 import '../features/insights/insights.dart';
 import '../features/profile/profile.dart';
 import '../features/appointments/doctor.dart';
+import '../features/pcos_quiz/quiz.dart';
+import '../features/logging/editor.dart';
+
+enum AppDestination {
+  home('Home', Icons.home_outlined),
+  wellbeing('Wellbeing', Icons.spa_outlined),
+  doctor('Doctor', Icons.medical_services_outlined),
+  timeline('Timeline', Icons.calendar_month_outlined),
+  quiz('PCOS Quiz', Icons.assignment_outlined);
+
+  const AppDestination(this.label, this.icon);
+  final String label;
+  final IconData icon;
+  String get route => '/app/$name';
+  static AppDestination? fromRoute(String? route) => values
+      .where((d) => d.route == route || (d == quiz && route == '/app/pcos'))
+      .firstOrNull;
+}
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, this.initialDestination = AppDestination.home});
+  final AppDestination initialDestination;
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
-  int index = 0;
+  final scaffold = GlobalKey<ScaffoldState>();
+  late AppDestination selected = widget.initialDestination;
   int? lastHomeRequest;
+  final visited = <AppDestination>{};
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final request = SessionScope.of(context).homeRequest;
-    if (lastHomeRequest != null && lastHomeRequest != request) index = 0;
+    if (lastHomeRequest != null && lastHomeRequest != request) {
+      selected = AppDestination.home;
+    }
     lastHomeRequest = request;
+    visited.add(selected);
+    if (selected == AppDestination.doctor) loadAppointments();
   }
 
-  void select(int value) {
-    setState(() => index = value);
+  void loadAppointments() {
     final repo = SessionScope.of(context).appointments;
-    if (value == 4 && !repo.loaded && !repo.busy) repo.load();
+    if (!repo.loaded && !repo.busy) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) repo.load();
+      });
+    }
   }
 
-  static const labels = [
-    'Home',
-    'Timeline',
-    'Learn',
-    'Insights',
-    'Doctor',
-    'Profile',
-  ];
-  static const icons = [
-    Icons.home_outlined,
-    Icons.calendar_month_outlined,
-    Icons.menu_book_outlined,
-    Icons.insights_outlined,
-    Icons.medical_services_outlined,
-    Icons.person_outline,
-  ];
-  final pages = const [
-    HomePage(),
-    TimelinePage(),
-    LearnPage(),
-    InsightsPage(),
-    DoctorPage(),
-    ProfilePage(),
-  ];
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(index == 0 ? 'auracare' : labels[index]),
-      bottom: PreferredSize(
-        preferredSize: Size.fromHeight(demoBadgeHeight(context)),
-        child: DemoBadge(),
+  void select(AppDestination destination) {
+    setState(() {
+      selected = destination;
+      visited.add(destination);
+    });
+    if (destination == AppDestination.doctor) loadAppointments();
+  }
+
+  Widget page(AppDestination d) => switch (d) {
+    AppDestination.home => HomePage(
+      onWellbeing: () => select(AppDestination.wellbeing),
+      onQuiz: () => select(AppDestination.quiz),
+    ),
+    AppDestination.wellbeing => MoodCheckInPage(
+      embedded: true,
+      active: selected == d,
+    ),
+    AppDestination.doctor => const DoctorPage(),
+    AppDestination.timeline => const TimelinePage(),
+    AppDestination.quiz => QuizPage(
+      embedded: true,
+      active: selected == d,
+      onDoctor: () => select(AppDestination.doctor),
+      onExit: () => select(AppDestination.home),
+    ),
+  };
+  void drawerPage(Widget page, String route) {
+    Navigator.pop(context);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: RouteSettings(name: route),
+        builder: (_) => page is UnavailablePage
+            ? page
+            : Scaffold(
+                appBar: AppBar(title: const Text('auracare')),
+                body: SafeArea(child: page),
+              ),
       ),
-    ),
-    body: SafeArea(
-      top: false,
-      bottom: false,
-      child: IndexedStack(index: index, children: pages),
-    ),
-    bottomNavigationBar: SafeArea(
-      top: false,
-      child: Material(
-        color: Palette.mist,
-        child:
-            MediaQuery.textScalerOf(context).scale(14) > 20 ||
-                MediaQuery.sizeOf(context).width < 360
-            ? LayoutBuilder(
-                builder: (context, constraints) => Wrap(
-                  children: List.generate(
-                    labels.length,
-                    (i) => SizedBox(
-                      width: constraints.maxWidth / 2,
-                      child: Semantics(
-                        selected: index == i,
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: TextButton(
-                            key: ValueKey('tab-${labels[i]}'),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(48, 56),
-                              backgroundColor: index == i
-                                  ? Palette.blush
-                                  : Palette.mist,
-                            ),
-                            onPressed: () => select(i),
-                            child: Text(labels[i], textAlign: TextAlign.center),
-                          ),
-                        ),
-                      ),
+    );
+  }
+
+  Widget drawerItem(String title, IconData icon, Widget page, String route) =>
+      ListTile(
+        leading: Icon(icon),
+        title: Text(title),
+        onTap: () => drawerPage(page, route),
+      );
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: selected == AppDestination.home || selected == AppDestination.quiz,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop && selected != AppDestination.quiz) {
+        select(AppDestination.home);
+      }
+    },
+    child: Scaffold(
+      key: scaffold,
+      appBar: AppBar(
+        leading: IconButton(
+          key: const ValueKey('open-drawer'),
+          tooltip: 'Open navigation menu',
+          onPressed: () => scaffold.currentState!.openDrawer(),
+          icon: const AuraLogoIcon(),
+        ),
+        title: const Text('auracare'),
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(demoBadgeHeight(context)),
+          child: const DemoBadge(),
+        ),
+      ),
+      drawer: Drawer(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    const AuraLogo(width: 160),
+                    drawerItem(
+                      'Profile',
+                      Icons.person_outline,
+                      const ProfilePage(),
+                      '/app/profile',
                     ),
-                  ),
-                ),
-              )
-            : Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: List.generate(
-                    labels.length,
-                    (i) => Expanded(
-                      child: Semantics(
-                        selected: index == i,
-                        button: true,
-                        label: labels[i],
-                        excludeSemantics: true,
-                        child: InkWell(
-                          key: ValueKey('tab-${labels[i]}'),
-                          onTap: () => select(i),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 8,
-                              horizontal: 2,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: index == i
-                                        ? Palette.blush
-                                        : Palette.mist,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Icon(icons[i], color: Palette.plum),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  labels[i],
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: index == i
-                                        ? FontWeight.w700
-                                        : FontWeight.w400,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                    drawerItem(
+                      'Learn',
+                      Icons.menu_book_outlined,
+                      const LearnPage(),
+                      '/app/learn',
                     ),
-                  ),
+                    drawerItem(
+                      'Insights',
+                      Icons.insights_outlined,
+                      const InsightsPage(),
+                      '/app/insights',
+                    ),
+                    const Divider(),
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('More from Auracare'),
+                    ),
+                    drawerItem(
+                      'AI Assistant',
+                      Icons.chat_bubble_outline,
+                      const UnavailablePage(
+                        'AI Assistant',
+                        'No AI or report-processing service is connected. No uploads or health records are sent.',
+                      ),
+                      '/app/assistant',
+                    ),
+                    drawerItem(
+                      'Sisterhood',
+                      Icons.people_outline,
+                      const UnavailablePage(
+                        'Sisterhood',
+                        'Community and moderation are not connected. Private records are never shared.',
+                      ),
+                      '/app/sisterhood',
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.local_hospital_outlined),
+                      title: const Text('Appointment & Clinic'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        select(AppDestination.doctor);
+                      },
+                    ),
+                  ],
                 ),
               ),
+              const Divider(height: 1),
+              ListTile(
+                key: const ValueKey('profile-footer'),
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: const Text('Alex'),
+                subtitle: const Text('Demo profile'),
+                onTap: () => drawerPage(const ProfilePage(), '/app/profile'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: IndexedStack(
+          index: AppDestination.values.indexOf(selected),
+          children: [
+            for (final d in AppDestination.values)
+              TickerMode(
+                enabled: selected == d,
+                child: visited.contains(d) ? page(d) : const SizedBox.shrink(),
+              ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Material(
+          color: Palette.white,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final labelSize = MediaQuery.textScalerOf(context).scale(12);
+              final minimumWidth =
+                  64.0 + (labelSize > 12 ? (labelSize - 12) * 5 : 0);
+              final itemWidth =
+                  (constraints.maxWidth / AppDestination.values.length).clamp(
+                    minimumWidth,
+                    double.infinity,
+                  );
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: MediaQuery.sizeOf(context).width,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      for (final d in AppDestination.values)
+                        Semantics(
+                          selected: selected == d,
+                          button: true,
+                          label: d.label,
+                          excludeSemantics: true,
+                          child: SizedBox(
+                            width: itemWidth,
+                            child: InkWell(
+                              key: ValueKey('tab-${d.label}'),
+                              onTap: () => select(d),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                  vertical: 10,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: selected == d
+                                            ? Palette.blush
+                                            : Palette.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 4,
+                                        ),
+                                        child: Icon(d.icon, color: Palette.ink),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      d.label,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: selected == d
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ),
     ),
   );
