@@ -41,6 +41,8 @@ class _EntryEditorState extends State<EntryEditor> {
         (widget.initialMood == null ? '' : 'Feeling: ${widget.initialMood}. '),
   );
   late Severity severity = widget.entry?.severity ?? Severity.unspecified;
+  late bool? periodStart = widget.entry?.periodStart;
+  late bool? periodEnd = widget.entry?.periodEnd;
   late RecordedMood? mood =
       widget.entry?.recordedMood ?? RecordedMood.fromLabel(widget.initialMood);
   DateTime? when;
@@ -125,6 +127,8 @@ class _EntryEditorState extends State<EntryEditor> {
           note: note.text.trim(),
           severity: severity,
           version: (widget.entry?.version ?? 0) + 1,
+          periodStart: widget.type == EntryType.bleeding ? periodStart : null,
+          periodEnd: widget.type == EntryType.bleeding ? periodEnd : null,
           mood: widget.type == EntryType.wellness && selection == 'Mood'
               ? mood
               : null,
@@ -271,6 +275,36 @@ class _EntryEditorState extends State<EntryEditor> {
                               });
                             },
                     ),
+                  if (widget.type == EntryType.bleeding) ...[
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('First day of a new period'),
+                      subtitle: const Text(
+                        'Mark only an actual start, not every bleeding day.',
+                      ),
+                      value: periodStart == true,
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() {
+                              periodStart = value;
+                              dirty = true;
+                            }),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Last bleeding day of this period'),
+                      subtitle: const Text(
+                        'Optional. Confirm when the period has finished.',
+                      ),
+                      value: periodEnd == true,
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() {
+                              periodEnd = value;
+                              dirty = true;
+                            }),
+                    ),
+                  ],
                   if (widget.type == EntryType.wellness && selection == 'Mood')
                     DropdownButtonFormField<RecordedMood>(
                       initialValue: mood,

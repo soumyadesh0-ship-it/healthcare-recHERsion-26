@@ -206,11 +206,11 @@ void main() {
       );
       await tester.pumpAndSettle();
       await reveal(tester, find.text('Appointment preparation'));
-      expect(find.text('Cycle records'), findsNothing);
+      expect(find.text('Cycle Summary'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('tab-Timeline')));
       await tester.pumpAndSettle();
       await reveal(tester, find.text('Log period'));
-      expect(find.text('Cycle records'), findsOneWidget);
+      expect(find.text('Cycle Summary'), findsOneWidget);
       await tester.tap(find.text('Log period'));
       await tester.pumpAndSettle();
       expect(find.text('New bleeding'), findsOneWidget);

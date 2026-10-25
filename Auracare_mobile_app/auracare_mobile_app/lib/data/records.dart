@@ -41,6 +41,8 @@ class HealthEntry {
     this.version = 1,
     this.mood,
     this.savedAt,
+    this.periodStart,
+    this.periodEnd,
   });
   final String id, title, note, zone;
   final EntryType type;
@@ -51,6 +53,7 @@ class HealthEntry {
 
   /// Successful save time, separate from the observation's calendar date.
   final DateTime? savedAt;
+  final bool? periodStart, periodEnd;
 
   FlowIntensity? get flowIntensity {
     if (type != EntryType.bleeding) return null;
@@ -84,6 +87,8 @@ class HealthEntry {
     version: version,
     mood: mood,
     savedAt: timestamp,
+    periodStart: periodStart,
+    periodEnd: periodEnd,
   );
   Map<String, Object?> toJson() => {
     'id': id,
@@ -96,6 +101,8 @@ class HealthEntry {
     'version': version,
     if (mood != null) 'mood': mood!.name,
     if (savedAt != null) 'savedAt': savedAt!.toIso8601String(),
+    if (periodStart != null) 'periodStart': periodStart,
+    if (periodEnd != null) 'periodEnd': periodEnd,
   };
   String get description =>
       '${dayLabel(when)} ${timeLabel(when)} · $zone\n$title · ${type.name}'

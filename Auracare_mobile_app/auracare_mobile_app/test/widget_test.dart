@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:auracare_mobile_app/app/app.dart';
 import 'package:auracare_mobile_app/app/session.dart';
 import 'package:auracare_mobile_app/data/records.dart';
+import 'package:auracare_mobile_app/data/appointments.dart';
 import 'package:auracare_mobile_app/data/services.dart';
 import 'package:auracare_mobile_app/features/appointments/appointments.dart';
 import 'package:auracare_mobile_app/features/cycle/cycle.dart';
@@ -65,43 +66,56 @@ void main() {
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SetupPreference.channel, (_) async => false);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          AndroidAppointmentStore.channel,
+          (_) async => null,
+        );
   });
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SetupPreference.channel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(AndroidAppointmentStore.channel, null);
   });
-  testWidgets(
-    'onboarding skip/demo entry and five tabs preserve search state',
-    (tester) async {
-      await tester.pumpWidget(const AuracareApp());
+  testWidgets('onboarding skip/demo entry and six tabs preserve search state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const AuracareApp());
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Get started');
+    expect(find.text('Your body. Your rhythm. Your space.'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Next'));
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Back');
+    await tapText(tester, 'Skip');
+    await tapText(tester, 'Start empty demo');
+    expect(find.text('Demo — sample data'), findsOneWidget);
+    for (final tab in [
+      'Timeline',
+      'Learn',
+      'Insights',
+      'Doctor',
+      'Profile',
+      'Home',
+    ]) {
+      await tester.tap(find.byKey(ValueKey('tab-$tab')));
       await tester.pumpAndSettle();
-      await tapText(tester, 'Get started');
-      expect(find.text('Your body. Your rhythm. Your space.'), findsOneWidget);
-      await tester.tap(find.bySemanticsLabel('Next'));
-      await tester.pumpAndSettle();
-      await tapText(tester, 'Back');
-      await tapText(tester, 'Skip');
-      await tapText(tester, 'Start empty demo');
-      expect(find.text('Demo — sample data'), findsOneWidget);
-      for (final tab in ['Timeline', 'Learn', 'Insights', 'Profile', 'Home']) {
-        await tester.tap(find.byKey(ValueKey('tab-$tab')));
-        await tester.pumpAndSettle();
-      }
-      await tester.tap(find.byKey(const ValueKey('tab-Learn')));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('resource-search')),
-        'no topic matches',
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('No matching topics'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('tab-Home')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('tab-Learn')));
-      await tester.pumpAndSettle();
-      expect(find.text('no topic matches'), findsOneWidget);
-    },
-  );
+    }
+    await tester.tap(find.byKey(const ValueKey('tab-Learn')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('resource-search')),
+      'no topic matches',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('No matching topics'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('tab-Home')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tab-Learn')));
+    await tester.pumpAndSettle();
+    expect(find.text('no topic matches'), findsOneWidget);
+  });
   testWidgets(
     'journal validation, failure retry preserves text and propagates save',
     (tester) async {
@@ -156,7 +170,10 @@ void main() {
       ),
     );
     await show(tester, const CyclePage(), session);
-    expect(find.text('Optional, always'), findsOneWidget);
+    expect(
+      find.text('Keep tracking your cycle to see patterns over time.'),
+      findsOneWidget,
+    );
     await tester.tap(find.byType(SwitchListTile));
     await tester.pumpAndSettle();
     expect(session.cycleEnabled, isTrue);
@@ -359,7 +376,7 @@ void main() {
     },
   );
   for (final width in [320.0, 390.0, 430.0]) {
-    testWidgets('five destinations at width $width and text scale 200%', (
+    testWidgets('six destinations at width $width and text scale 200%', (
       tester,
     ) async {
       tester.view.physicalSize = Size(width, 1000);
@@ -372,7 +389,14 @@ void main() {
       });
       await tester.pumpWidget(const AuracareApp(showOnboarding: false));
       await tester.pumpAndSettle();
-      for (final tab in ['Home', 'Timeline', 'Learn', 'Insights', 'Profile']) {
+      for (final tab in [
+        'Home',
+        'Timeline',
+        'Learn',
+        'Insights',
+        'Doctor',
+        'Profile',
+      ]) {
         await tester.tap(find.byKey(ValueKey('tab-$tab')));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'Active tab: $tab');

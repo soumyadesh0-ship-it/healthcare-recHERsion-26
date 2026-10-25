@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import 'session.dart';
 import 'setup_preference.dart';
@@ -21,7 +22,9 @@ class _AuracareAppState extends State<AuracareApp> {
       DemoSession(records: DemoRecordsRepository(sample: false));
   late bool entered = !widget.showOnboarding;
   bool loading = true;
-  bool splash = true;
+  late bool splash = widget.showOnboarding;
+  bool previewOnboarding =
+      kDebugMode && const bool.fromEnvironment('PREVIEW_ONBOARDING');
   final preference = SetupPreference();
   @override
   void initState() {
@@ -42,7 +45,9 @@ class _AuracareAppState extends State<AuracareApp> {
   Future<void> enter(bool sample) async {
     final saved = await preference.complete();
     if (!mounted) return;
-    session.records.reset(sample: sample);
+    if (sample && session.records.entries.isEmpty) {
+      session.records.reset(sample: true);
+    }
     setState(() => entered = true);
     if (!saved) {
       // Unsupported platforms still allow entry; Android persists the flag.
@@ -67,6 +72,14 @@ class _AuracareAppState extends State<AuracareApp> {
         title: 'AuraCare',
         debugShowCheckedModeBanner: false,
         theme: auracareTheme(),
+        routes: kDebugMode
+            ? {
+                '/debug/onboarding': (context) =>
+                    Onboarding(onEnter: (_) => Navigator.pop(context)),
+                '/debug/splash': (context) =>
+                    WelcomeSplash(onContinue: () => Navigator.pop(context)),
+              }
+            : const {},
         builder: (context, child) {
           final media = MediaQuery.of(context);
           return MediaQuery(
@@ -77,12 +90,19 @@ class _AuracareAppState extends State<AuracareApp> {
             child: child!,
           );
         },
-        home: loading
-            ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+        home: previewOnboarding
+            ? Onboarding(
+                onEnter: (_) => setState(() => previewOnboarding = false),
+              )
+            : splash
+            ? WelcomeSplash(
+                buttonLabel: entered ? 'Continue' : 'Get started',
+                onContinue: () {
+                  if (!loading) setState(() => splash = false);
+                },
+              )
             : entered
             ? const AppShell()
-            : splash
-            ? WelcomeSplash(onContinue: () => setState(() => splash = false))
             : Onboarding(onEnter: enter),
       ),
     ),

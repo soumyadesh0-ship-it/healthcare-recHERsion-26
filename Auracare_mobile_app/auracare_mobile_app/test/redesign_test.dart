@@ -49,6 +49,10 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(const AuracareApp());
       await tester.pumpAndSettle();
+      expect(find.text('Continue'), findsOneWidget);
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
       expect(find.text('Get started'), findsNothing);
       await tester.scrollUntilVisible(

@@ -1,8 +1,10 @@
 import 'records.dart';
+import 'articles.dart';
 
 class ResourcePreview {
   const ResourcePreview(this.topic);
   final String topic;
+  EducationalArticle? get article => ArticleCatalog.articles[topic];
   String get question =>
       'What should I ask a healthcare professional about $topic?';
 }

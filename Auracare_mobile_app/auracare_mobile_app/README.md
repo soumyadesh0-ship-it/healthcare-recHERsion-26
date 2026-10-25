@@ -1,5 +1,7 @@
 # Auracare mobile demo
 
+Phase 3 features, data handling, sources and verification: [Cycle estimates, Doctor and Learn](../../docs/AURACARE_PHASE3.md). Doctor appointments now persist in app-private Android storage; the original health records remain session-only.
+
 Current UI refinements, logo assets, changed files and device/test results: [AuraCare refinement](../../docs/AURACARE_REFINEMENT.md).
 
 Flutter/Dart mobile UI with a shared in-memory synthetic session. No real account, secure persistence, health uploads, model, AI service, community or provider integration is connected. Do not enter real health information. Android remembers first-run onboarding completion using a native SharedPreferences flag. Health records and other session preferences remain in memory; restarting starts with empty records. Samples are loaded only through an explicit demo action. No sensitive-text storage package is used.

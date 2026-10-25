@@ -2,6 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../app/theme.dart';
 import '../data/records.dart';
+import '../data/cycles.dart';
+
+Color phaseColor(PhaseEstimate estimate) => switch (estimate.phase) {
+  CyclePhase.menstrual => Palette.blush,
+  CyclePhase.follicular => Palette.follicular,
+  CyclePhase.fertile => Palette.fertile,
+  CyclePhase.ovulation => Palette.ovulation,
+  CyclePhase.luteal => Palette.lavender,
+  CyclePhase.approaching => Palette.approaching[estimate.step.clamp(0, 2)],
+  CyclePhase.predictedPeriod => Palette.pink,
+};
 
 Color eventColor(EntryType type) => switch (type) {
   EntryType.bleeding => Palette.pink,
@@ -37,10 +48,12 @@ class RecordCalendar extends StatefulWidget {
     required this.entries,
     required this.onSelect,
     this.selected,
+    this.estimates,
   });
   final List<HealthEntry> entries;
   final ValueChanged<DateTime> onSelect;
   final DateTime? selected;
+  final CycleEstimates? estimates;
   @override
   State<RecordCalendar> createState() => _RecordCalendarState();
 }
@@ -170,6 +183,7 @@ class _RecordCalendarState extends State<RecordCalendar> {
                               widget.selected != null &&
                               dayLabel(widget.selected!) == dayLabel(date);
                           final flow = summary.period?.flowIntensity;
+                          final estimate = widget.estimates?.on(date);
                           final mood = summary.moodEntry?.recordedMood;
                           final description = [
                             if (events.isEmpty)
@@ -177,7 +191,9 @@ class _RecordCalendarState extends State<RecordCalendar> {
                             else
                               events.map((e) => e.name).join(', '),
                             if (flow != null) flowLabel(flow),
+                            if (flow != null) CyclePhase.menstrual.label,
                             if (mood != null) 'Mood: ${mood.label}',
+                            if (estimate != null) estimate.phase.label,
                           ].join('; ');
                           return Expanded(
                             child: SizedBox(
@@ -194,7 +210,9 @@ class _RecordCalendarState extends State<RecordCalendar> {
                                       'calendar-day-${dayLabel(date)}',
                                     ),
                                     color: flow == null
-                                        ? Palette.white
+                                        ? (estimate == null
+                                              ? Palette.white
+                                              : phaseColor(estimate))
                                         : flowColor(flow),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
@@ -230,6 +248,20 @@ class _RecordCalendarState extends State<RecordCalendar> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
+                                          if (estimate != null)
+                                            Container(
+                                              key: ValueKey(
+                                                'estimate-${dayLabel(date)}',
+                                              ),
+                                              width: 8,
+                                              height: 4,
+                                              decoration: BoxDecoration(
+                                                color: phaseColor(estimate),
+                                                border: Border.all(
+                                                  color: Palette.action,
+                                                ),
+                                              ),
+                                            ),
                                           Wrap(
                                             spacing: 2,
                                             children: [
@@ -266,6 +298,24 @@ class _RecordCalendarState extends State<RecordCalendar> {
           },
         ),
         const SizedBox(height: 16),
+        if (widget.estimates?.available == true) ...[
+          Text(
+            'Approximate phases · outlined markers are estimates',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              for (final phase in CyclePhase.values.where(
+                (p) => p != CyclePhase.menstrual,
+              ))
+                legend(phaseColor(PhaseEstimate(phase)), phase.label, context),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
         Wrap(
           spacing: 14,
           runSpacing: 8,
@@ -326,6 +376,10 @@ class _RecordCalendarState extends State<RecordCalendar> {
                         ? 'No recorded mood'
                         : 'Recorded mood: ${selected.moodEntry!.recordedMood!.label}',
                   ),
+                  if (widget.estimates != null)
+                    Text(
+                      'Calendar estimate: ${widget.estimates!.on(widget.selected!)?.phase.label ?? 'unavailable for this date'}',
+                    ),
                 ],
               ),
             ),

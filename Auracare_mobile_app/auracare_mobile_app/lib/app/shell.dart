@@ -8,6 +8,7 @@ import '../features/timeline/timeline.dart';
 import '../features/learn/learn.dart';
 import '../features/insights/insights.dart';
 import '../features/profile/profile.dart';
+import '../features/appointments/doctor.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -26,12 +27,26 @@ class _AppShellState extends State<AppShell> {
     lastHomeRequest = request;
   }
 
-  static const labels = ['Home', 'Timeline', 'Learn', 'Insights', 'Profile'];
+  void select(int value) {
+    setState(() => index = value);
+    final repo = SessionScope.of(context).appointments;
+    if (value == 4 && !repo.loaded && !repo.busy) repo.load();
+  }
+
+  static const labels = [
+    'Home',
+    'Timeline',
+    'Learn',
+    'Insights',
+    'Doctor',
+    'Profile',
+  ];
   static const icons = [
     Icons.home_outlined,
     Icons.calendar_month_outlined,
     Icons.menu_book_outlined,
     Icons.insights_outlined,
+    Icons.medical_services_outlined,
     Icons.person_outline,
   ];
   final pages = const [
@@ -39,20 +54,13 @@ class _AppShellState extends State<AppShell> {
     TimelinePage(),
     LearnPage(),
     InsightsPage(),
+    DoctorPage(),
     ProfilePage(),
   ];
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(index == 0 ? 'auracare' : labels[index]),
-      actions: [
-        if (index == 0)
-          IconButton(
-            tooltip: 'Open profile',
-            onPressed: () => setState(() => index = 4),
-            icon: const Icon(Icons.person_outline),
-          ),
-      ],
       bottom: PreferredSize(
         preferredSize: Size.fromHeight(demoBadgeHeight(context)),
         child: DemoBadge(),
@@ -67,11 +75,13 @@ class _AppShellState extends State<AppShell> {
       top: false,
       child: Material(
         color: Palette.mist,
-        child: MediaQuery.textScalerOf(context).scale(14) > 20
+        child:
+            MediaQuery.textScalerOf(context).scale(14) > 20 ||
+                MediaQuery.sizeOf(context).width < 360
             ? LayoutBuilder(
                 builder: (context, constraints) => Wrap(
                   children: List.generate(
-                    5,
+                    labels.length,
                     (i) => SizedBox(
                       width: constraints.maxWidth / 2,
                       child: Semantics(
@@ -86,7 +96,7 @@ class _AppShellState extends State<AppShell> {
                                   ? Palette.blush
                                   : Palette.mist,
                             ),
-                            onPressed: () => setState(() => index = i),
+                            onPressed: () => select(i),
                             child: Text(labels[i], textAlign: TextAlign.center),
                           ),
                         ),
@@ -100,7 +110,7 @@ class _AppShellState extends State<AppShell> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: List.generate(
-                    5,
+                    labels.length,
                     (i) => Expanded(
                       child: Semantics(
                         selected: index == i,
@@ -109,7 +119,7 @@ class _AppShellState extends State<AppShell> {
                         excludeSemantics: true,
                         child: InkWell(
                           key: ValueKey('tab-${labels[i]}'),
-                          onTap: () => setState(() => index = i),
+                          onTap: () => select(i),
                           borderRadius: BorderRadius.circular(16),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
@@ -137,7 +147,7 @@ class _AppShellState extends State<AppShell> {
                                   labels[i],
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 12,
                                     fontWeight: index == i
                                         ? FontWeight.w700
                                         : FontWeight.w400,

@@ -9,6 +9,12 @@ import 'package:auracare_mobile_app/app/app.dart';
 import 'package:auracare_mobile_app/app/session.dart';
 import 'package:auracare_mobile_app/app/theme.dart';
 import 'package:auracare_mobile_app/data/records.dart';
+import 'package:auracare_mobile_app/data/appointments.dart';
+import 'package:auracare_mobile_app/data/cycles.dart';
+import 'package:auracare_mobile_app/data/services.dart';
+import 'package:auracare_mobile_app/core/calendar.dart';
+import 'package:auracare_mobile_app/features/appointments/doctor.dart';
+import 'package:auracare_mobile_app/features/learn/learn.dart';
 import 'package:auracare_mobile_app/features/cycle/cycle.dart';
 import 'package:auracare_mobile_app/features/onboarding/onboarding.dart';
 import 'package:auracare_mobile_app/features/logging/editor.dart';
@@ -16,6 +22,14 @@ import 'package:auracare_mobile_app/features/pcos_quiz/quiz.dart';
 
 const capture = bool.fromEnvironment('CAPTURE_PREVIEWS');
 const flutterSdk = String.fromEnvironment('FLUTTER_SDK');
+
+class _LayoutAppointmentStore implements AppointmentStore {
+  @override
+  Future<String?> read() async => null;
+  @override
+  Future<void> write(String json) async {}
+}
+
 void main() {
   setUpAll(() async {
     if (capture && flutterSdk.isNotEmpty) {
@@ -66,7 +80,12 @@ void main() {
             tester.view.resetViewInsets();
             tester.platformDispatcher.clearTextScaleFactorTestValue();
           });
-          final session = DemoSession()..cycleEnabled = true;
+          final session = DemoSession(
+            appointments: AppointmentsRepository(
+              store: _LayoutAppointmentStore(),
+            ),
+          )..cycleEnabled = true;
+          await session.appointments.load();
           final boundary = GlobalKey();
           Future<void> frame(
             Widget page,
@@ -126,6 +145,57 @@ void main() {
           await frame(const LogEntryPage(), 'log_entry');
           await frame(const MoodCheckInPage(), 'mood');
           await frame(const CyclePage(), 'cycle');
+          await frame(
+            const Scaffold(body: SafeArea(child: DoctorPage())),
+            'doctor',
+          );
+          await frame(
+            const DoctorAppointmentEditor(),
+            'doctor_editor',
+            keyboard: true,
+          );
+          await frame(
+            const ResourcePage(resource: ResourcePreview('Postpartum')),
+            'postpartum_article',
+          );
+          final cycles = <HealthEntry>[
+            for (var i = 0; i < 4; i++) ...[
+              HealthEntry(
+                id: 'start-$i',
+                type: EntryType.bleeding,
+                title: 'Bleeding · Heavy',
+                when: addDays(DateTime(2026, 1, 1), i * 30),
+                zone: 'Device local',
+                periodStart: true,
+              ),
+              HealthEntry(
+                id: 'end-$i',
+                type: EntryType.bleeding,
+                title: 'Bleeding · Light',
+                when: addDays(DateTime(2026, 1, 1), i * 30 + 4),
+                zone: 'Device local',
+                periodEnd: true,
+              ),
+            ],
+          ];
+          await frame(
+            Scaffold(
+              body: SafeArea(
+                child: SingleChildScrollView(
+                  child: RecordCalendar(
+                    entries: cycles,
+                    selected: DateTime(2026, 4, 18),
+                    onSelect: (_) {},
+                    estimates: CycleEstimates(
+                      CycleHistory(cycles),
+                      today: DateTime(2026, 4, 20),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            'cycle_estimates',
+          );
           await frame(
             const EntryEditor(type: EntryType.journal),
             'journal_keyboard',

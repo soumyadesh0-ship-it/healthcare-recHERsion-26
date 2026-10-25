@@ -207,8 +207,13 @@ class _OnboardingState extends State<Onboarding> {
 }
 
 class WelcomeSplash extends StatelessWidget {
-  const WelcomeSplash({super.key, required this.onContinue});
+  const WelcomeSplash({
+    super.key,
+    required this.onContinue,
+    this.buttonLabel = 'Get started',
+  });
   final VoidCallback onContinue;
+  final String buttonLabel;
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(
@@ -239,7 +244,7 @@ class WelcomeSplash extends StatelessWidget {
                       const SizedBox(height: 28),
                       FilledButton(
                         onPressed: onContinue,
-                        child: const Text('Get started'),
+                        child: Text(buttonLabel),
                       ),
                     ],
                   ),

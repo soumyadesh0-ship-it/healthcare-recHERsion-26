@@ -4,6 +4,7 @@ import '../../app/session.dart';
 import '../../core/widgets.dart';
 import '../../core/calendar.dart';
 import '../../data/records.dart';
+import '../../data/cycles.dart';
 import '../logging/editor.dart';
 import '../cycle/cycle.dart';
 
@@ -42,6 +43,10 @@ class _TimelinePageState extends State<TimelinePage> {
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
     final all = session.records.entries;
+    final estimates = CycleEstimates(
+      CycleHistory(all),
+      unsuitable: session.unsuitableCycleEstimates,
+    );
     final entries = all
         .where(
           (e) =>
@@ -67,9 +72,39 @@ class _TimelinePageState extends State<TimelinePage> {
         const Text(
           'Recorded days tell part of the story. Unrecorded days are unknown.',
         ),
+        if (widget.onlyType == null) ...[
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Show approximate cycle phases'),
+            value: session.showCycleEstimates,
+            onChanged: (value) =>
+                session.update(() => session.showCycleEstimates = value),
+          ),
+          if (session.showCycleEstimates) ...[
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'My cycles may be irregular or unsuitable for calendar estimates',
+              ),
+              subtitle: const Text(
+                'For example PCOS, pregnancy/postpartum, perimenopause or hormonal contraception.',
+              ),
+              value: session.unsuitableCycleEstimates,
+              onChanged: (value) => session.update(
+                () => session.unsuitableCycleEstimates = value ?? false,
+              ),
+            ),
+            Text(estimates.status),
+            const Text(CycleEstimates.warning),
+            const Text(
+              'Period starts must be marked explicitly. Calendar timing cannot confirm that ovulation occurred. The midpoint is a visual anchor within a broad possible interval, not a measured ovulation day.',
+            ),
+          ],
+        ],
         if (widget.onlyType == null)
           RecordCalendar(
             entries: all,
+            estimates: session.showCycleEstimates ? estimates : null,
             selected: range?.start,
             onSelect: (day) =>
                 setState(() => range = DateTimeRange(start: day, end: day)),
@@ -91,7 +126,7 @@ class _TimelinePageState extends State<TimelinePage> {
               TextButton.icon(
                 onPressed: () => pushPage(context, const CyclePage()),
                 icon: const Icon(Icons.calendar_month_outlined),
-                label: const Text('Cycle records'),
+                label: const Text('Cycle Summary'),
               ),
             ],
           ),

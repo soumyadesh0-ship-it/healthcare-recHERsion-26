@@ -22,6 +22,14 @@ abstract final class Palette {
   static const heavyFlow = Color(0xFFD66F91);
   static const happyMood = Color(0xFFE8BC71);
   static const tiredMood = Color(0xFFB8A9CF);
+  static const follicular = Color(0xFFD8EDE5);
+  static const fertile = Color(0xFFB8DED2);
+  static const ovulation = Color(0xFF89BDB1);
+  static const approaching = [
+    Color(0xFFFCF0F5),
+    Color(0xFFF9E7EE),
+    Color(0xFFF6DEE7),
+  ];
   static const plum = ink;
   static const orchid = lavender;
   static const mist = white;

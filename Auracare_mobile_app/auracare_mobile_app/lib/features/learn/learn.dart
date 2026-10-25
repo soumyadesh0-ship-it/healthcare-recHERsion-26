@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/session.dart';
 import '../../core/widgets.dart';
 import '../../core/topic_illustration.dart';
 import '../../app/theme.dart';
 import '../../data/services.dart';
+import '../../data/articles.dart';
 import '../appointments/appointments.dart';
 
 class LearnPage extends StatefulWidget {
@@ -21,7 +23,9 @@ class _LearnPageState extends State<LearnPage> {
     final resources = SessionScope.of(context).resources.resources;
     final filtered = resources.where(
       (r) =>
-          r.topic.toLowerCase().contains(query.toLowerCase()) &&
+          (r.article?.searchableText ?? r.topic.toLowerCase()).contains(
+            query.toLowerCase(),
+          ) &&
           (category == 'All' || r.topic == category),
     );
     return ListView(
@@ -30,7 +34,7 @@ class _LearnPageState extends State<LearnPage> {
       children: spaced([
         const Heading('Learn'),
         const Text(
-          "Women's Health Library · structural previews. Medical articles, sources and clinical reviews have not been supplied.",
+          'Health information for every stage. Source-linked educational drafts; clinical editorial review pending.',
         ),
         TextField(
           key: const ValueKey('resource-search'),
@@ -64,7 +68,9 @@ class _LearnPageState extends State<LearnPage> {
           ActionCard(
             color: Palette.tiles[resources.indexOf(r) % Palette.tiles.length],
             title: r.topic,
-            subtitle: 'Preview · article not available',
+            subtitle: r.article == null
+                ? 'Needs editorial review · article unavailable'
+                : 'Read article · source-linked education',
             leading: TopicIllustration(topic: r.topic),
             onTap: () => pushPage(context, ResourcePage(resource: r)),
           ),
@@ -76,36 +82,106 @@ class _LearnPageState extends State<LearnPage> {
 class ResourcePage extends StatelessWidget {
   const ResourcePage({super.key, required this.resource});
   final ResourcePreview resource;
+  Future<void> openSource(BuildContext context, String url) async {
+    try {
+      final opened = await const MethodChannel('org.auracare/links')
+          .invokeMethod<bool>('open', url);
+      if (opened != true && context.mounted) {
+        tell(context, 'Browser unavailable. Use Copy link to read the source.');
+      }
+    } catch (_) {
+      if (context.mounted) {
+        tell(context, 'Browser unavailable. Use Copy link to read the source.');
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => PageFrame(
-    title: 'Topic preview',
-    children: [
-      Heading(resource.topic),
-      const Panel(
-        child: Text(
-          'Structural preview — not medical guidance. No verified article or source URL is available for this topic.',
+  Widget build(BuildContext context) {
+    final article = resource.article;
+    return PageFrame(
+      title: resource.topic,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TopicIllustration(topic: resource.topic),
         ),
-      ),
-      const Text(
-        'Review status: not reviewed. Reviewer and review date: unavailable. No medical endorsement is claimed.',
-      ),
-      const Text(
-        'This space will hold accessible explanations, references and revision history after editorial review. For now, prepare a question in your own words.',
-      ),
-      FilledButton(
-        onPressed: () {
-          SessionScope.of(context).addQuestion(resource.question);
-          tell(context, 'Question added to appointment preparation');
-        },
-        child: const Text('Add consultation question'),
-      ),
-      OutlinedButton(
-        onPressed: () => pushPage(context, const AppointmentPage()),
-        child: const Text('Open appointment preparation'),
-      ),
-      const Text(
-        'Copy source link unavailable: no verified local source URL was supplied.',
-      ),
-    ],
-  );
+        Heading(resource.topic),
+        if (article == null)
+          const EmptyNotice(
+            'Editorial review needed',
+            'Verified article content has not been supplied for this topic.',
+          )
+        else ...[
+          Text(article.introduction),
+          const Text(EducationalArticle.disclaimer),
+          for (final section in article.sections) ...[
+            Text(
+              section.heading,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            SelectableText(section.body),
+          ],
+          Text(
+            'Frequently asked',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(article.question),
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(article.answer),
+              ),
+            ],
+          ),
+          Text(
+            'References & further reading',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const Text(
+            'Sources checked ${EducationalArticle.checkedOn}. This is a source-check date, not a clinical review or endorsement. Local service details in these international sources may differ.',
+          ),
+          for (final source in article.sources)
+            Panel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    source.title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  SelectableText(source.url),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      TextButton(
+                        onPressed: () => openSource(context, source.url),
+                        child: const Text('Open source'),
+                      ),
+                      TextButton(
+                        onPressed: () => copyText(context, source.url),
+                        child: const Text('Copy link'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
+        FilledButton(
+          onPressed: () {
+            SessionScope.of(context).addQuestion(resource.question);
+            tell(context, 'Question added to appointment preparation');
+          },
+          child: const Text('Add consultation question'),
+        ),
+        OutlinedButton(
+          onPressed: () => pushPage(context, const AppointmentPage()),
+          child: const Text('Open appointment preparation'),
+        ),
+      ],
+    );
+  }
 }
