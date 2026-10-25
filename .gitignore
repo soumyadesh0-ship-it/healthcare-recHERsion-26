@@ -1,0 +1,54 @@
+# Flutter and Android build output (including nested Flutter applications)
+**/build/
+**/.dart_tool/
+**/.gradle/
+**/.cxx/
+**/.pub/
+**/.pub-cache/
+**/.widget_preview/
+**/coverage/
+**/*.apk
+**/*.aab
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# Local Android Studio / IntelliJ state
+**/.idea/
+**/*.iml
+**/*.ipr
+**/*.iws
+
+# Machine-specific Android configuration and signing secrets
+**/android/local.properties
+**/android/key.properties
+**/android/**/*.jks
+**/android/**/*.keystore
+
+# Flutter-generated platform integration (not handwritten platform source)
+**/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/App.framework/
+**/ios/Flutter/Flutter.framework/
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/flutter_assets/
+**/ios/Runner/GeneratedPluginRegistrant.h
+**/ios/Runner/GeneratedPluginRegistrant.m
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/**/DerivedData/
+**/ios/**/xcuserdata/
+
+# Temporary logs, editor swap files and caches
+**/*.log
+**/*.swp
+**/*.swo
+**/.cache/
+**/.DS_Store
+**/Thumbs.db
+
+# Keep Flutter source, assets, tests, pubspec.lock and handwritten Android/iOS
+# source trackable. Gradle wrapper scripts/JAR and .vscode settings are not
+# ignored here: review those project configuration files independently.
