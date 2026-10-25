@@ -49,9 +49,11 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(const AuracareApp());
       await tester.pumpAndSettle();
-      expect(find.text('Continue'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Continue'), findsOneWidget);
       await tester.ensureVisible(find.text('Continue'));
-      await tester.tap(find.text('Continue'));
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
       expect(find.text('Get started'), findsNothing);
@@ -82,7 +84,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('Continue'),
+        find.widgetWithText(FilledButton, 'Continue'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
@@ -97,14 +99,21 @@ void main() {
         -200,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.text('Calm'));
+      final calmTile = find
+          .ancestor(of: find.text('Calm'), matching: find.byType(InkWell))
+          .first;
+      await tester.ensureVisible(calmTile);
+      await tester.pumpAndSettle();
+      await tester.tap(calmTile);
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('Continue'),
+        find.widgetWithText(FilledButton, 'Continue'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.text('Continue'));
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
       await tester.pumpAndSettle();
       expect(find.text('Feeling: Calm. '), findsOneWidget);
       await tester.scrollUntilVisible(

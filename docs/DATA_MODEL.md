@@ -1,5 +1,7 @@
 # Data model
 
+> Implemented Flutter extension: EntryType adds spotting/discharge and HealthEntry has optional TrackingDetails (amount, color, consistency, odorChange, irritation). Existing records remain compatible. Health observations and game state remain memory-only; the prior separate appointment store is unchanged. No schema migration. See [field definitions and persistence](AURACARE_UNWIND_TRACKING.md).
+
 ## Status
 
 Conceptual entities only: no database, schema, tables, migrations or stored product data exist. Storage technology is undecided. Private entities use server IDs, owner references, timestamps and optimistic versions where mutable; enforce ownership across relationships.

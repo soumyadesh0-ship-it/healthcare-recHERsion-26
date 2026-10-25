@@ -19,6 +19,8 @@ Color eventColor(EntryType type) => switch (type) {
   EntryType.symptom => Palette.yellow,
   EntryType.wellness => Palette.turquoise,
   EntryType.journal => Palette.periwinkle,
+  EntryType.spotting => Palette.orchid,
+  EntryType.discharge => Palette.apricot,
 };
 Color flowColor(FlowIntensity intensity) => switch (intensity) {
   FlowIntensity.light => Palette.lightFlow,

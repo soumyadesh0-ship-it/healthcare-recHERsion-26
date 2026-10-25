@@ -1,5 +1,7 @@
 # Seven-module feature contracts
 
+> Current Flutter extension: optional Merge & Unwind game, spotting/discharge CRUD and an explicitly fictional doctor directory are implemented locally. The historical seven-module contracts below are retained; see [mobile extension handoff](AURACARE_UNWIND_TRACKING.md).
+
 ## Common status and behavior
 
 **Every feature below is planned; none is implemented, partial or prototyped.** Each module contract applies to every listed capability. Shared dependencies: verified identity for private operations, owner authorization, validation, persistence, purpose-specific consent and [safety](AI_AND_CLINICAL_SAFETY.md). Shared errors: expired session, denied/revoked access, validation, conflict, rate limit and service outage. Preserve safe input and never claim unsaved actions succeeded. Empty views invite optional input without pressure. Acceptance criteria are future tests.

@@ -131,8 +131,9 @@ class _TimelinePageState extends State<TimelinePage> {
             ],
           ),
         FilledButton.icon(
-          onPressed: () =>
-              openEditor(context, type: widget.onlyType ?? EntryType.symptom),
+          onPressed: () => widget.onlyType == null
+              ? pushPage(context, const LogEntryPage())
+              : openEditor(context, type: widget.onlyType!),
           icon: const Icon(Icons.add),
           label: Text(
             widget.onlyType == EntryType.journal

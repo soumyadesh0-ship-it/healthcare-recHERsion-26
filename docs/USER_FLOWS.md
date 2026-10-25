@@ -1,5 +1,7 @@
 # User flows
 
+> Current mobile flows: Home → Wellbeing check-in → Merge & Unwind → Back; Log entry → Spotting/Discharge → save → Timeline → explicitly selected appointment summary; Doctor → fictional directory search/filter, with no contact or booking actions. See [implemented behavior and limitations](AURACARE_UNWIND_TRACKING.md).
+
 ## Status
 
 No journeys/forms/navigation are implemented. All flows below are planned and use synthetic data until real-data gates pass.

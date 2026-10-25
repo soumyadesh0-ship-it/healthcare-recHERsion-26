@@ -14,6 +14,8 @@ import 'package:auracare_mobile_app/data/cycles.dart';
 import 'package:auracare_mobile_app/data/services.dart';
 import 'package:auracare_mobile_app/core/calendar.dart';
 import 'package:auracare_mobile_app/features/appointments/doctor.dart';
+import 'package:auracare_mobile_app/features/appointments/demo_directory.dart';
+import 'package:auracare_mobile_app/features/wellbeing/merge_game.dart';
 import 'package:auracare_mobile_app/features/learn/learn.dart';
 import 'package:auracare_mobile_app/features/cycle/cycle.dart';
 import 'package:auracare_mobile_app/features/onboarding/onboarding.dart';
@@ -91,6 +93,7 @@ void main() {
             Widget page,
             String name, {
             bool keyboard = false,
+            bool pauseGame = false,
           }) async {
             tester.view.viewInsets = FakeViewPadding(
               bottom: keyboard ? 280 : 0,
@@ -108,6 +111,11 @@ void main() {
                 ),
               ),
             );
+            if (pauseGame) {
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.inactive,
+              );
+            }
             await tester.pumpAndSettle();
             if (keyboard) {
               final field = find.byType(TextFormField).last;
@@ -138,12 +146,35 @@ void main() {
                 image.dispose();
               });
             }
+            if (pauseGame) {
+              tester.binding.handleAppLifecycleStateChanged(
+                AppLifecycleState.resumed,
+              );
+            }
           }
 
           await frame(WelcomeSplash(onContinue: () {}), 'splash');
           await frame(Onboarding(onEnter: (_) {}), 'onboarding');
           await frame(const LogEntryPage(), 'log_entry');
           await frame(const MoodCheckInPage(), 'mood');
+          await frame(const MergeGamePage(), 'merge_game', pauseGame: true);
+          await frame(const EntryEditor(type: EntryType.spotting), 'spotting');
+          await frame(
+            const EntryEditor(type: EntryType.discharge),
+            'discharge',
+            keyboard: true,
+          );
+          await frame(
+            const Scaffold(
+              body: SafeArea(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(20),
+                  child: DemoDirectory(),
+                ),
+              ),
+            ),
+            'demo_directory',
+          );
           await frame(const CyclePage(), 'cycle');
           await frame(
             const Scaffold(body: SafeArea(child: DoctorPage())),

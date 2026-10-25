@@ -287,7 +287,7 @@ void main() {
         return ((x > y ? x : y) + .05) / ((x < y ? x : y) + .05);
       }
 
-      expect(contrast(Palette.ink, Palette.purple), greaterThanOrEqualTo(4.5));
+      expect(contrast(Palette.mist, Palette.purple), greaterThanOrEqualTo(4.5));
       expect(
         contrast(Palette.action, Palette.white),
         greaterThanOrEqualTo(4.5),

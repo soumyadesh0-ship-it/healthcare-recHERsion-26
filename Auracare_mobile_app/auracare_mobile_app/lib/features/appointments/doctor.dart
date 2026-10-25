@@ -5,6 +5,7 @@ import '../../core/widgets.dart';
 import '../../data/appointments.dart';
 import '../../data/records.dart';
 import 'appointments.dart';
+import 'demo_directory.dart';
 
 class DoctorPage extends StatelessWidget {
   const DoctorPage({super.key});
@@ -69,6 +70,8 @@ class DoctorPage extends StatelessWidget {
         const Text(
           'Appointments are stored on this Android device in app-private storage, excluded from Android backup. They are not sent to a clinic or cloud service. Uninstalling the app or clearing its storage deletes them. Device security still matters.',
         ),
+        const Divider(),
+        const DemoDirectory(),
       ]),
     );
   }

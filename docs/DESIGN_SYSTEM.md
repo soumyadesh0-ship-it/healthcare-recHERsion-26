@@ -1,5 +1,7 @@
 # Design system
 
+> Current explicit mobile brief restores the exact Plum #45364B, Orchid #DD7ED9, Mist #F4EFF4, Apricot #F5B07E and Blush cloud #F9E3D8 base tokens. Existing semantic calendar colors remain; typography, spacing, cards and navigation are reused. See [mobile extension handoff](AURACARE_UNWIND_TRACKING.md).
+
 > Mobile override (2026-10-25): the explicit mobile brief and [Flutter theme](../Auracare_mobile_app/auracare_mobile_app/lib/app/theme.dart) govern the new demo: five new palette tokens, system sans, 20px gutters, rounded cards/forms, five labeled bottom destinations and >=48px controls. The web/3D layout below is historical proposed scope. See [Mobile UI handoff](MOBILE_UI_HANDOFF.md).
 
 ## Status

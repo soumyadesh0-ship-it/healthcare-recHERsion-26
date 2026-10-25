@@ -6,6 +6,7 @@ import 'setup_preference.dart';
 import '../data/records.dart';
 import 'theme.dart';
 import 'shell.dart';
+import 'navigation.dart';
 import '../features/onboarding/onboarding.dart';
 
 class AuracareApp extends StatefulWidget {
@@ -72,6 +73,7 @@ class _AuracareAppState extends State<AuracareApp> {
         title: 'AuraCare',
         debugShowCheckedModeBanner: false,
         theme: auracareTheme(),
+        navigatorObservers: [auraRouteObserver],
         routes: kDebugMode
             ? {
                 '/debug/onboarding': (context) =>

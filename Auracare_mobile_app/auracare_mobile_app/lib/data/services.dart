@@ -117,6 +117,7 @@ String appointmentSummary(
       .map(
         (e) =>
             '${dayLabel(e.when)} ${timeLabel(e.when)} (${e.zone}) — ${e.title} [${e.type.name}, v${e.version}]'
+            '${e.tracking == null ? '' : '\n${e.tracking!.summary}'}'
             '${includeNotes && e.note.isNotEmpty ? '\n${e.note}' : ''}',
       )
       .join('\n\n');

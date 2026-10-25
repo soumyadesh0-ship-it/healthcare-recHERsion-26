@@ -1,5 +1,7 @@
 # Testing
 
+> Current Flutter extension validation: 68 tests passed, clean analysis/format, successful Android ARM64 debug build. New coverage includes physical circle merges/stacking/overflow, observation CRUD and summaries, inert fictional contacts, lifecycle pause and narrow/large-text/keyboard layouts. Physical-device gameplay was not tested. See [executed validation and limits](AURACARE_UNWIND_TRACKING.md).
+
 ## Verified status
 
 No application, suite, runner, scripts, compiler configuration or CI exists. No runtime/API/build/accessibility/security/performance test has run. Documentation checks do not prove functioning software. Choose tooling after architecture approval; do not install dependencies for this task.

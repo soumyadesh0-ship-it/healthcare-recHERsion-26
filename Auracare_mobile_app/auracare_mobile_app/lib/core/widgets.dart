@@ -244,6 +244,8 @@ IconData entryIcon(EntryType type) => switch (type) {
   EntryType.journal => Icons.edit_note,
   EntryType.bleeding => Icons.water_drop_outlined,
   EntryType.wellness => Icons.spa_outlined,
+  EntryType.spotting => Icons.grain,
+  EntryType.discharge => Icons.opacity_outlined,
 };
 
 class EntryCard extends StatelessWidget {
@@ -253,7 +255,8 @@ class EntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ActionCard(
     title: entry.title,
-    subtitle: '${timeLabel(entry.when)} · ${entry.type.name}\n${entry.zone}',
+    subtitle:
+        '${timeLabel(entry.when)} · ${entry.type.name}\n${entry.zone}${entry.tracking == null ? '' : '\n${entry.tracking!.summary}'}',
     icon: entryIcon(entry.type),
     onTap: onTap,
   );

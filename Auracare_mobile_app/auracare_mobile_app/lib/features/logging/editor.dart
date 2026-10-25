@@ -5,6 +5,7 @@ import '../../core/widgets.dart';
 import '../../core/characters.dart';
 import '../../app/theme.dart';
 import '../../data/records.dart';
+import '../wellbeing/merge_game.dart';
 
 void openEditor(
   BuildContext context, {
@@ -40,6 +41,17 @@ class _EntryEditorState extends State<EntryEditor> {
         widget.entry?.note ??
         (widget.initialMood == null ? '' : 'Feeling: ${widget.initialMood}. '),
   );
+  late final color = TextEditingController(
+    text: widget.entry?.tracking?.color ?? '',
+  );
+  late final consistency = TextEditingController(
+    text: widget.entry?.tracking?.consistency ?? '',
+  );
+  late TrackingAmount? amount = widget.entry?.tracking?.amount;
+  late ObservationAnswer? odorChange = widget.entry?.tracking?.odorChange;
+  late ObservationAnswer? irritation = widget.entry?.tracking?.irritation;
+  bool get isTracking =>
+      widget.type == EntryType.spotting || widget.type == EntryType.discharge;
   late Severity severity = widget.entry?.severity ?? Severity.unspecified;
   late bool? periodStart = widget.entry?.periodStart;
   late bool? periodEnd = widget.entry?.periodEnd;
@@ -65,6 +77,7 @@ class _EntryEditorState extends State<EntryEditor> {
     ],
     EntryType.wellness => ['Mood', 'Energy', 'Stress', 'Sleep'],
     EntryType.journal => [],
+    EntryType.spotting || EntryType.discharge => [],
   };
   @override
   void didChangeDependencies() {
@@ -83,10 +96,30 @@ class _EntryEditorState extends State<EntryEditor> {
   void dispose() {
     title.dispose();
     note.dispose();
+    color.dispose();
+    consistency.dispose();
     super.dispose();
   }
 
   void changed() => setState(() => dirty = true);
+  Widget _answerField(
+    String label,
+    String key,
+    ObservationAnswer? value,
+    ValueChanged<ObservationAnswer?> onChanged,
+  ) => DropdownButtonFormField<ObservationAnswer>(
+    key: ValueKey(key),
+    initialValue: value,
+    isExpanded: true,
+    itemHeight: null,
+    decoration: InputDecoration(labelText: label),
+    items: [
+      const DropdownMenuItem(value: null, child: Text('Not recorded')),
+      for (final answer in ObservationAnswer.values)
+        DropdownMenuItem(value: answer, child: Text(observationLabel(answer))),
+    ],
+    onChanged: busy ? null : onChanged,
+  );
   Future<void> leave() async {
     if (busy) return;
     if (!dirty ||
@@ -121,6 +154,8 @@ class _EntryEditorState extends State<EntryEditor> {
               ? (title.text.trim().isEmpty
                     ? 'Journal entry'
                     : title.text.trim())
+              : isTracking
+              ? observationLabel(widget.type)
               : selection!,
           when: when!,
           zone: zone!,
@@ -129,6 +164,23 @@ class _EntryEditorState extends State<EntryEditor> {
           version: (widget.entry?.version ?? 0) + 1,
           periodStart: widget.type == EntryType.bleeding ? periodStart : null,
           periodEnd: widget.type == EntryType.bleeding ? periodEnd : null,
+          tracking: isTracking
+              ? TrackingDetails(
+                  amount: amount!,
+                  color: color.text.trim().isEmpty ? null : color.text.trim(),
+                  consistency:
+                      widget.type == EntryType.discharge &&
+                          consistency.text.trim().isNotEmpty
+                      ? consistency.text.trim()
+                      : null,
+                  odorChange: widget.type == EntryType.discharge
+                      ? odorChange
+                      : null,
+                  irritation: widget.type == EntryType.discharge
+                      ? irritation
+                      : null,
+                )
+              : null,
           mood: widget.type == EntryType.wellness && selection == 'Mood'
               ? mood
               : null,
@@ -248,7 +300,7 @@ class _EntryEditorState extends State<EntryEditor> {
                       maxLength: 80,
                       onChanged: (_) => changed(),
                     )
-                  else
+                  else if (!isTracking)
                     DropdownButtonFormField<String>(
                       itemHeight: null,
                       initialValue: selection,
@@ -275,6 +327,73 @@ class _EntryEditorState extends State<EntryEditor> {
                               });
                             },
                     ),
+                  if (isTracking) ...[
+                    const Text(
+                      'Describe what you observed. These choices do not diagnose a condition. Health records last only for this session.',
+                    ),
+                    DropdownButtonFormField<TrackingAmount>(
+                      key: const ValueKey('tracking-amount'),
+                      initialValue: amount,
+                      isExpanded: true,
+                      itemHeight: null,
+                      decoration: const InputDecoration(labelText: 'Amount'),
+                      items: [
+                        for (final value in TrackingAmount.values)
+                          DropdownMenuItem(
+                            value: value,
+                            child: Text(observationLabel(value)),
+                          ),
+                      ],
+                      validator: (value) =>
+                          value == null ? 'Choose an amount.' : null,
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() {
+                              amount = value;
+                              dirty = true;
+                            }),
+                    ),
+                    TextFormField(
+                      key: const ValueKey('tracking-color'),
+                      controller: color,
+                      enabled: !busy,
+                      maxLength: 80,
+                      decoration: const InputDecoration(
+                        labelText: 'Color (optional)',
+                      ),
+                      onChanged: (_) => changed(),
+                    ),
+                    if (widget.type == EntryType.discharge) ...[
+                      TextFormField(
+                        key: const ValueKey('tracking-consistency'),
+                        controller: consistency,
+                        enabled: !busy,
+                        maxLength: 80,
+                        decoration: const InputDecoration(
+                          labelText: 'Consistency (optional)',
+                        ),
+                        onChanged: (_) => changed(),
+                      ),
+                      _answerField(
+                        'Odor change (optional)',
+                        'odor-change',
+                        odorChange,
+                        (value) => setState(() {
+                          odorChange = value;
+                          dirty = true;
+                        }),
+                      ),
+                      _answerField(
+                        'Itching or irritation (optional)',
+                        'irritation',
+                        irritation,
+                        (value) => setState(() {
+                          irritation = value;
+                          dirty = true;
+                        }),
+                      ),
+                    ],
+                  ],
                   if (widget.type == EntryType.bleeding) ...[
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
@@ -481,6 +600,13 @@ class LogEntryPage extends StatelessWidget {
       const SizedBox(height: 8),
       for (final item in const [
         ('Period', EntryType.bleeding, Icons.water_drop_outlined, Palette.pink),
+        ('Spotting', EntryType.spotting, Icons.grain, Palette.orchid),
+        (
+          'Discharge',
+          EntryType.discharge,
+          Icons.opacity_outlined,
+          Palette.apricot,
+        ),
         (
           'Symptoms',
           EntryType.symptom,
@@ -543,6 +669,12 @@ class _MoodCheckInPageState extends State<MoodCheckInPage> {
     children: [
       const Heading('How are you feeling today?'),
       const Text('A small check-in, just for you.'),
+      ActionCard(
+        title: 'Merge & Unwind',
+        subtitle: 'A little space to pause and play.',
+        icon: Icons.bubble_chart_outlined,
+        onTap: () => pushPage(context, const MergeGamePage()),
+      ),
       LayoutBuilder(
         builder: (context, constraints) => Wrap(
           spacing: 16,

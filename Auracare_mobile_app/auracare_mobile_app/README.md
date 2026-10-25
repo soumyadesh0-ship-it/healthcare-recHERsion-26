@@ -1,5 +1,7 @@
 # Auracare mobile demo
 
+Current game, spotting/discharge and fictional directory: [implementation and verification](../../docs/AURACARE_UNWIND_TRACKING.md). No new dependencies. Health/game state remains session-only.
+
 Phase 3 features, data handling, sources and verification: [Cycle estimates, Doctor and Learn](../../docs/AURACARE_PHASE3.md). Doctor appointments now persist in app-private Android storage; the original health records remain session-only.
 
 Current UI refinements, logo assets, changed files and device/test results: [AuraCare refinement](../../docs/AURACARE_REFINEMENT.md).
