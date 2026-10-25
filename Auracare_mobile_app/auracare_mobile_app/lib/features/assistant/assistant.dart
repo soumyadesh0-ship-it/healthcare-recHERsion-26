@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import '../../app/theme.dart';
+import '../../app/session.dart';
+import '../../data/api_client.dart';
 import '../../data/chat_service.dart';
+import '../chat/chat.dart' show confirmAiProcessing;
 
 /// Embedded in the existing assistant route's Scaffold.
 class AssistantPage extends StatefulWidget {
@@ -16,17 +18,20 @@ class AssistantPage extends StatefulWidget {
 class _AssistantPageState extends State<AssistantPage> {
   final input = TextEditingController();
   final scroll = ScrollController();
-  final client = http.Client();
-  late final service = widget.service ?? ChatService(client: client);
+  AuthenticatedChatService? get accountService => context
+      .dependOnInheritedWidgetOfExactType<SessionScope>()
+      ?.notifier
+      ?.chatService;
+  bool get configured => widget.service?.configured ?? accountService != null;
   final messages = <({bool user, String text})>[];
   bool sending = false;
+  bool confirming = false;
   String? error;
 
   @override
   void dispose() {
     input.dispose();
     scroll.dispose();
-    client.close();
     super.dispose();
   }
 
@@ -40,7 +45,15 @@ class _AssistantPageState extends State<AssistantPage> {
 
   Future<void> send() async {
     final prompt = input.text.trim();
-    if (sending || prompt.isEmpty || !service.configured) return;
+    if (sending || confirming || prompt.isEmpty || !configured) return;
+    final chat = accountService;
+    if (widget.service == null) {
+      setState(() => confirming = true);
+      final confirmed = await confirmAiProcessing(context);
+      if (!mounted) return;
+      setState(() => confirming = false);
+      if (!confirmed) return;
+    }
     setState(() {
       messages.add((user: true, text: prompt));
       sending = true;
@@ -49,13 +62,27 @@ class _AssistantPageState extends State<AssistantPage> {
     });
     showLatest();
     try {
-      final reply = await service.send(prompt);
+      final reply = widget.service != null
+          ? await widget.service!.send(prompt)
+          : await chat!.send(prompt: prompt, aiProcessingConfirmed: true);
       if (!mounted) return;
       setState(() => messages.add((user: false, text: reply)));
     } on ChatException catch (e) {
       if (!mounted) return;
       setState(() {
         error = e.message;
+        input.text = prompt;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        error = e.message;
+        input.text = prompt;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        error = 'The assistant is unavailable. Your message is ready to retry.';
         input.text = prompt;
       });
     } finally {
@@ -146,12 +173,14 @@ class _AssistantPageState extends State<AssistantPage> {
             ],
           ),
         ),
-      if (!service.configured || error != null)
+      if (!configured || error != null)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Text(
             error ??
-                'Chat is not configured. Set API_BASE_URL and rebuild the app.',
+                (widget.service != null
+                    ? 'Chat is not configured. Set API_BASE_URL and rebuild the app.'
+                    : 'Sign in to use AI chat. No messages are sent in demo mode.'),
             semanticsLabel: error,
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
@@ -165,7 +194,7 @@ class _AssistantPageState extends State<AssistantPage> {
               child: TextField(
                 key: const ValueKey('chat-input'),
                 controller: input,
-                enabled: service.configured && !sending,
+                enabled: configured && !sending && !confirming,
                 minLines: 1,
                 maxLines: 4,
                 maxLength: 10000,
@@ -179,7 +208,7 @@ class _AssistantPageState extends State<AssistantPage> {
             IconButton.filled(
               key: const ValueKey('chat-send'),
               tooltip: 'Send message',
-              onPressed: sending || !service.configured ? null : send,
+              onPressed: sending || confirming || !configured ? null : send,
               icon: const Icon(Icons.send_rounded),
             ),
           ],

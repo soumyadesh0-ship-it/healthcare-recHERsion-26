@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:auracare_mobile_app/app/app.dart';
 import 'package:auracare_mobile_app/app/session.dart';
 import 'package:auracare_mobile_app/data/appointments.dart';
+import 'package:auracare_mobile_app/core/widgets.dart';
 
 class _ResponsiveAppointmentStore implements AppointmentStore {
   @override
@@ -13,6 +14,27 @@ class _ResponsiveAppointmentStore implements AppointmentStore {
 }
 
 void main() {
+  testWidgets('badge measurement tolerates the initial zero viewport', (
+    tester,
+  ) async {
+    double? height;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(size: Size.zero),
+          child: Builder(
+            builder: (context) {
+              height = demoBadgeHeight(context, isAuthenticated: true);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+    expect(height, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   const destinations = ['Home', 'Timeline', 'Wellbeing', 'Doctor', 'PCOS Quiz'];
   const viewports = [
     (width: 320.0, height: 844.0, name: 'very narrow portrait'),

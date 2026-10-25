@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../app/session.dart';
-import '../../app/quiz_integration.dart';
 import '../../app/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/records.dart';
 
 import '../logging/editor.dart';
+import '../logging/inline_log_entry.dart';
 import '../journal/journal.dart';
-import '../appointments/appointments.dart';
-import '../pcos_quiz/quiz.dart';
 import '../timeline/timeline.dart';
 
 class HomePage extends StatelessWidget {
@@ -56,11 +54,8 @@ class HomePage extends StatelessWidget {
           '${entries.length} records in this session',
           style: Theme.of(context).textTheme.bodySmall,
         ),
-        FilledButton.icon(
-          onPressed: () => pushPage(context, const LogEntryPage()),
-          icon: const Icon(Icons.add),
-          label: const Text('Log entry'),
-        ),
+        Text('Log Entry', style: Theme.of(context).textTheme.titleLarge),
+        const InlineLogEntry(),
         Text('Your spaces', style: Theme.of(context).textTheme.titleLarge),
         ActionCard(
           title: 'AI Assistant',
@@ -75,30 +70,6 @@ class HomePage extends StatelessWidget {
           subtitle: 'A separate place for your words',
           icon: Icons.edit_note,
           onTap: () => pushPage(context, const JournalPage()),
-        ),
-        ActionCard(
-          title: 'Wellbeing',
-          color: Palette.lavender,
-          subtitle: 'A little play or a gentle pause',
-          icon: Icons.spa_outlined,
-          onTap:
-              onWellbeing ?? () => pushPage(context, const MoodCheckInPage()),
-        ),
-        ActionCard(
-          title: 'PCOS quiz',
-          color: Palette.yellow,
-          subtitle: QuizIntegrationScope.maybeOf(context)?.signedIn == true
-              ? 'Experimental questionnaire'
-              : 'Experimental questionnaire demo',
-          icon: Icons.assignment_outlined,
-          onTap: onQuiz ?? () => pushPage(context, const QuizPage()),
-        ),
-        ActionCard(
-          title: 'Appointment preparation',
-          color: Palette.turquoise,
-          subtitle: 'Choose notes and questions to take with you',
-          icon: Icons.description_outlined,
-          onTap: () => pushPage(context, const AppointmentPage()),
         ),
 
         TextButton(

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
 
 enum BreathCue { inhale, exhale, pause, finish }
@@ -10,7 +8,7 @@ typedef HapticPulse = Future<void> Function(BreathCue cue);
 class BreathHaptics {
   BreathHaptics({HapticPulse? pulse}) : pulse = pulse ?? platformPulse;
   final HapticPulse pulse;
-  Timer? pending;
+  Future<void>? active;
   int generation = 0;
   bool supported = true;
   static Future<void> platformPulse(BreathCue cue) => switch (cue) {
@@ -20,14 +18,17 @@ class BreathHaptics {
   };
   void cancel() {
     generation++;
-    pending?.cancel();
-    pending = null;
   }
 
   Future<void> cue(BreathCue cue) async {
     cancel();
     if (!supported) return;
     final token = generation;
+    // Keep at most one platform request in flight. Only the newest waiting
+    // transition may send, and pause/exit invalidates it through generation.
+    final previous = active;
+    if (previous != null) await previous;
+    if (token != generation || !supported) return;
     Future<void> send() async {
       if (token != generation || !supported) return;
       try {
@@ -35,13 +36,16 @@ class BreathHaptics {
       } on MissingPluginException {
         supported = false;
       } on PlatformException {
-        supported = false;
+        // A temporary platform failure must not disable the whole next session.
       }
     }
 
-    await send();
-    if (cue == BreathCue.exhale && supported && token == generation) {
-      pending = Timer(const Duration(milliseconds: 120), send);
+    final request = send();
+    active = request;
+    try {
+      await request;
+    } finally {
+      if (identical(active, request)) active = null;
     }
   }
 }

@@ -161,8 +161,10 @@ class _MergeGamePageState extends State<MergeGamePage>
               ),
             ],
           ),
-          const Text(
-            'Match the same color to merge. Green becomes turquoise, then pink, then purple. Each merge adds to your score. Larger pairs that reach the size limit stay separate.',
+          Text(
+            'Match colors. Merge bubbles. Unwind!',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
           Semantics(
             label:

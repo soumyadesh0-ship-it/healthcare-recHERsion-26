@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:auracare_mobile_app/app/theme.dart';
+import 'package:auracare_mobile_app/app/session.dart';
+import 'package:auracare_mobile_app/data/api_client.dart';
+import 'package:auracare_mobile_app/data/auth_service.dart';
 import 'package:auracare_mobile_app/data/chat_service.dart';
 import 'package:auracare_mobile_app/features/assistant/assistant.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +12,104 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'auth_test.dart' show FakeAuth, now;
+
 void main() {
+  testWidgets(
+    'sidebar assistant uses current account token and confirms each prompt',
+    (tester) async {
+      final gateway = FakeAuth();
+      final auth = AuraAuthController(gateway: gateway, clock: () => now);
+      await auth.signIn('synthetic@example.com', 'synthetic-password');
+      var requests = 0;
+      final response = Completer<http.Response>();
+      final transport = MockClient((request) {
+        requests++;
+        expect(request.url.path, '/chat');
+        expect(request.headers['Authorization'], 'Bearer synthetic-token');
+        expect(jsonDecode(request.body), {
+          'prompt': 'Hello',
+          'ai_processing_confirmed': true,
+        });
+        return response.future;
+      });
+      final session = DemoSession(
+        chatService: AuthenticatedChatService(
+          auth: auth,
+          createClient: () => AuraApiClient(
+            config: ApiConfig(baseUrl: 'https://synthetic.invalid'),
+            tokenProvider: auth,
+            httpClient: transport,
+          ),
+        ),
+      );
+      addTearDown(() async {
+        session.dispose();
+        auth.dispose();
+        transport.close();
+        await gateway.events.close();
+      });
+      await tester.pumpWidget(
+        SessionScope(
+          session: session,
+          child: MaterialApp(
+            theme: auracareTheme(),
+            home: const Scaffold(body: AssistantPage()),
+          ),
+        ),
+      );
+      await tester.enterText(find.byKey(const ValueKey('chat-input')), 'Hello');
+      await tester.tap(find.byKey(const ValueKey('chat-send')));
+      await tester.pumpAndSettle();
+      expect(find.text('Send this message to AI?'), findsOneWidget);
+      expect(requests, 0);
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Send to AI'));
+      await tester.pump();
+      expect(requests, 1);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      response.complete(
+        http.Response('{"response":"Synthetic authenticated response"}', 200),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Synthetic authenticated response'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'sidebar assistant does not send anonymous messages in demo mode',
+    (tester) async {
+      final session = DemoSession();
+      addTearDown(session.dispose);
+      await tester.pumpWidget(
+        SessionScope(
+          session: session,
+          child: const MaterialApp(home: Scaffold(body: AssistantPage())),
+        ),
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+            .enabled,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(const ValueKey('chat-send')))
+            .onPressed,
+        isNull,
+      );
+      expect(
+        find.textContaining('No messages are sent in demo mode'),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   test('chat sends only prompt and reads the response string', () async {
     final client = MockClient((request) async {
       expect(request.method, 'POST');

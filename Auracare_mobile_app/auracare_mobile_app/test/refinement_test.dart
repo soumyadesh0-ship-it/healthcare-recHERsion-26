@@ -205,7 +205,8 @@ void main() {
         AuracareApp(session: session, showOnboarding: false),
       );
       await tester.pumpAndSettle();
-      await reveal(tester, find.text('Appointment preparation'));
+      await reveal(tester, find.text('Recent records'));
+      expect(find.text('Appointment preparation'), findsNothing);
       expect(find.text('Cycle Summary'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('tab-Timeline')));
       await tester.pumpAndSettle();

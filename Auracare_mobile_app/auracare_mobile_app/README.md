@@ -1,5 +1,8 @@
 # Auracare mobile demo
 
+Current merge-repair findings, safe cloud-storage gate, validation and exact
+configured launch commands: [authentication/cloud repair](../../docs/AURACARE_MERGE_REPAIR.md).
+
 Supabase email/password account entry is implemented. See [authentication configuration and verification limits](../../docs/FLUTTER_AUTHENTICATION.md). Google sign-in remains disabled. Historical UI-only notes below predate authentication.
 
 The authenticated PCOS questionnaire can submit four disclosed fields after

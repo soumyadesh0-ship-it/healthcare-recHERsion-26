@@ -25,16 +25,20 @@ class ControllerAuthService implements AuthService, AccessTokenProvider {
 
   void _check() {
     if (controller.error == null) return;
-    final failure =
-        controller.error ==
-            const account.AuthFailure(account.AuthProblem.verificationRequired)
-                .message
-        ? AuthFailure.emailNotVerified
-        : controller.error ==
-              const account.AuthFailure(account.AuthProblem.invalidCredentials)
-                  .message
-        ? AuthFailure.invalidCredentials
-        : AuthFailure.rejected;
+    final problem = account.AuthProblem.values
+        .where(
+          (value) => account.AuthFailure(value).message == controller.error,
+        )
+        .firstOrNull;
+    final failure = switch (problem) {
+      account.AuthProblem.configuration => AuthFailure.unavailable,
+      account.AuthProblem.invalidCredentials => AuthFailure.invalidCredentials,
+      account.AuthProblem.verificationRequired => AuthFailure.emailNotVerified,
+      account.AuthProblem.weakPassword => AuthFailure.weakPassword,
+      account.AuthProblem.rateLimited => AuthFailure.rateLimited,
+      account.AuthProblem.unavailable => AuthFailure.network,
+      null => AuthFailure.rejected,
+    };
     throw AuthException(failure);
   }
 

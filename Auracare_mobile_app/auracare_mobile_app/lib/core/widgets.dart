@@ -101,6 +101,9 @@ class DemoBadge extends StatelessWidget {
 }
 
 double demoBadgeHeight(BuildContext context, {bool isAuthenticated = false}) {
+  final availableWidth = MediaQuery.sizeOf(context).width - 55;
+  // Android can attach the widget tree before its first viewport metrics arrive.
+  if (availableWidth <= 0) return 0;
   final painter = TextPainter(
     text: TextSpan(
       text:
@@ -119,7 +122,7 @@ double demoBadgeHeight(BuildContext context, {bool isAuthenticated = false}) {
     textDirection: Directionality.of(context),
     textScaler: MediaQuery.textScalerOf(context),
   );
-  painter.layout(maxWidth: MediaQuery.sizeOf(context).width - 55);
+  painter.layout(maxWidth: availableWidth);
   final height = painter.height.ceilToDouble() + 8;
   painter.dispose();
   return height;

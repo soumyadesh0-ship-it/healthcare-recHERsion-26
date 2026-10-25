@@ -5,6 +5,56 @@ import '../../app/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/api_client.dart';
 
+Future<bool> confirmAiProcessing(BuildContext context) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        var checked = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Send this message to AI?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Only the message you typed will be sent to the AuraCare '
+                  'backend and its configured AI provider. Your records and '
+                  'chat history are not attached. Avoid sharing identifying '
+                  'details.',
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: checked,
+                  title: const Text('I agree to AI processing of this message'),
+                  onChanged: (value) =>
+                      setDialogState(() => checked = value ?? false),
+                ),
+                const Text(
+                  'AI responses can be wrong. This is general information, '
+                  'not diagnosis or treatment. For urgent symptoms, seek '
+                  'local emergency medical care.',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: checked
+                    ? () => Navigator.pop(dialogContext, true)
+                    : null,
+                child: const Text('Send to AI'),
+              ),
+            ],
+          ),
+        );
+      },
+    ) ??
+    false;
+
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
 
@@ -13,7 +63,11 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatMessage {
-  const _ChatMessage(this.text, {this.fromAssistant = false, this.isError = false});
+  const _ChatMessage(
+    this.text, {
+    this.fromAssistant = false,
+    this.isError = false,
+  });
 
   final String text;
   final bool fromAssistant, isError;
@@ -32,55 +86,7 @@ class _ChatPageState extends State<ChatPage> {
     super.dispose();
   }
 
-  Future<bool> _confirmAiProcessing() async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) {
-          var checked = false;
-          return StatefulBuilder(
-            builder: (context, setDialogState) => AlertDialog(
-              title: const Text('Send this message to AI?'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Only the message you typed will be sent to the AuraCare '
-                    'backend and its configured AI provider. Your records and '
-                    'chat history are not attached. Avoid sharing identifying '
-                    'details.',
-                  ),
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: checked,
-                    title: const Text('I agree to AI processing of this message'),
-                    onChanged: (value) =>
-                        setDialogState(() => checked = value ?? false),
-                  ),
-                  const Text(
-                    'AI responses can be wrong. This is general information, '
-                    'not diagnosis or treatment. For urgent symptoms, seek '
-                    'local emergency medical care.',
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: checked
-                      ? () => Navigator.pop(dialogContext, true)
-                      : null,
-                  child: const Text('Send to AI'),
-                ),
-              ],
-            ),
-          );
-        },
-      ) ??
-      false;
+  Future<bool> _confirmAiProcessing() => confirmAiProcessing(context);
 
   Future<void> _send() async {
     if (_sending || _confirming || _composer.text.trim().isEmpty) return;
@@ -114,9 +120,11 @@ class _ChatPageState extends State<ChatPage> {
       _scrollToLatest();
     } on ApiException catch (error) {
       if (!mounted) return;
-      setState(() => _messages.add(
-        _ChatMessage(error.message, fromAssistant: true, isError: true),
-      ));
+      setState(
+        () => _messages.add(
+          _ChatMessage(error.message, fromAssistant: true, isError: true),
+        ),
+      );
       _scrollToLatest();
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -229,9 +237,7 @@ class _ChatPageState extends State<ChatPage> {
                           ? const SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.send),
                     ),

@@ -58,8 +58,15 @@ class _BreathingSectionState extends State<BreathingSection>
   late final haptics = widget.haptics ?? BreathHaptics();
   bool vibration = false;
   int lastPhase = 0;
+  int? lastCuedPhase;
   void cue(BreathCue cue) {
     if (vibration && widget.active) unawaited(haptics.cue(cue));
+  }
+
+  void cuePhase(int phase) {
+    if (!vibration || !widget.active || lastCuedPhase == phase) return;
+    lastCuedPhase = phase;
+    cue(phase.isEven ? BreathCue.inhale : BreathCue.exhale);
   }
 
   late final Ticker ticker;
@@ -80,7 +87,7 @@ class _BreathingSectionState extends State<BreathingSection>
             (clock.elapsed.inMilliseconds % 10000 >= 4000 ? 1 : 0);
         if (phase != lastPhase) {
           lastPhase = phase;
-          cue(phase.isEven ? BreathCue.inhale : BreathCue.exhale);
+          cuePhase(phase);
         }
       }
     });
@@ -118,7 +125,7 @@ class _BreathingSectionState extends State<BreathingSection>
       lastPhase =
           clock.elapsed.inMilliseconds ~/ 10000 * 2 +
           (clock.elapsed.inMilliseconds % 10000 >= 4000 ? 1 : 0);
-      cue(lastPhase.isEven ? BreathCue.inhale : BreathCue.exhale);
+      cuePhase(lastPhase);
       ticker.start();
     }
     setState(() {});
@@ -171,7 +178,7 @@ class _BreathingSectionState extends State<BreathingSection>
             contentPadding: EdgeInsets.zero,
             title: const Text('Vibration cues'),
             subtitle: const Text(
-              'Optional short pulses; device settings and support apply.',
+              'Optional short pulses. Touch vibration must also be enabled in your device settings.',
             ),
             value: vibration,
             onChanged: (value) => setState(() {
@@ -191,6 +198,7 @@ class _BreathingSectionState extends State<BreathingSection>
                       : (_) => setState(() {
                           haptics.cancel();
                           clock.reset();
+                          lastCuedPhase = null;
                           clock.duration = Duration(minutes: minutes);
                         }),
                 ),
@@ -258,6 +266,7 @@ class _BreathingSectionState extends State<BreathingSection>
                   haptics.cancel();
                   ticker.stop();
                   setState(clock.reset);
+                  lastCuedPhase = null;
                 },
                 child: const Text('Reset'),
               ),
@@ -265,6 +274,7 @@ class _BreathingSectionState extends State<BreathingSection>
                 onPressed: () {
                   pause(feedback: false);
                   setState(clock.reset);
+                  lastCuedPhase = null;
                   cue(BreathCue.finish);
                 },
                 child: const Text('Stop session'),

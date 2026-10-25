@@ -159,7 +159,9 @@ class _AuthenticationRootState extends State<AuthenticationRoot> {
                         auth.mode == AccessMode.demo
                             ? 'Synthetic demo • No account access'
                             : _session!.records.isRemote
-                            ? 'Signed in • Cloud records are deployment-gated; status shown below'
+                            ? _session!.records.loaded
+                                  ? 'Signed in • Connected to private cloud records'
+                                  : 'Signed in • Cloud records unavailable; status shown below'
                             : 'Signed in • Session-only records; cloud sync is disabled',
                       ),
                     ),

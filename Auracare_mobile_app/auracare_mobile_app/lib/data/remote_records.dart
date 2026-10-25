@@ -168,12 +168,32 @@ class SupabaseHealthTransport implements HealthRecordsTransport {
       if (auth.userId != owner || auth.mode != AccessMode.authenticated) {
         throw RecordFailure(RecordProblem.cancelled);
       }
-      if (response.statusCode == 401 || response.statusCode == 403) {
-        if (response.statusCode == 401) auth.rejectAccessToken(token);
+      if (response.statusCode == 401) {
+        auth.rejectAccessToken(token);
         throw RecordFailure(RecordProblem.authentication);
       }
+      if (response.statusCode == 403) {
+        throw RecordFailure(RecordProblem.permission);
+      }
       if (response.statusCode == 404) {
-        throw RecordFailure(RecordProblem.deployment);
+        throw RecordFailure(RecordProblem.schema);
+      }
+      if (response.statusCode == 400) {
+        // Inspect only the stable error code; never display raw database details.
+        try {
+          final error = jsonDecode(response.body);
+          if (error is Map &&
+              {
+                'PGRST204',
+                'PGRST205',
+                '42703',
+                '42P01',
+              }.contains(error['code'])) {
+            throw RecordFailure(RecordProblem.schema);
+          }
+        } on FormatException {
+          // A malformed error response is handled as unavailable below.
+        }
       }
       if (response.statusCode == 409) {
         throw RecordFailure(RecordProblem.conflict);
@@ -309,9 +329,10 @@ class RemoteRecordsRepository extends RecordsRepository {
   }
 
   void _available() {
-    if (!enabled || transport == null) {
+    if (!enabled) {
       throw RecordFailure(RecordProblem.deployment);
     }
+    if (transport == null) throw RecordFailure(RecordProblem.configuration);
   }
 
   @override

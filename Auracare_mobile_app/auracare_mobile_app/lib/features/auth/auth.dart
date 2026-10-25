@@ -239,7 +239,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
       ),
-      if (!widget.auth.isConfigured) ...[
+      if (!widget.auth.isConfigured && widget.initialMessage == null) ...[
         const SizedBox(height: 12),
         const _AuthMessage(
           'Account sign-in is not configured in this build. Connect the shared authentication provider to enable login, Google sign-in, registration, and password recovery.',

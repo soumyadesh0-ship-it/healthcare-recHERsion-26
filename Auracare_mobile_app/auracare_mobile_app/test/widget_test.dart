@@ -73,7 +73,12 @@ Future<void> tapTab(WidgetTester tester, String label) async {
 Future<void> drawerPage(WidgetTester tester, String label) async {
   await tester.tap(find.byKey(const ValueKey('open-drawer')));
   await tester.pumpAndSettle();
-  await tapText(tester, label);
+  if (label == 'Profile') {
+    await tester.tap(find.byKey(const ValueKey('profile-footer')));
+    await tester.pumpAndSettle();
+  } else {
+    await tapText(tester, label);
+  }
 }
 
 void main() {

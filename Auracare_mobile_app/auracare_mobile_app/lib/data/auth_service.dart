@@ -6,11 +6,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api_client.dart';
 
-const authCallbackUrl = 'org.auracare.auracare_mobile_app://auth/callback';
+const authCallbackUrl = String.fromEnvironment(
+  'AURACARE_AUTH_REDIRECT_URL',
+  defaultValue: 'org.auracare.auracare_mobile_app://auth/callback',
+);
 
 class SupabaseConfiguration {
-  SupabaseConfiguration({required this.url, required this.anonKey}) {
-    final uri = Uri.tryParse(url);
+  SupabaseConfiguration({required String url, required String anonKey})
+    : url = url.trim(),
+      anonKey = anonKey.trim() {
+    final uri = Uri.tryParse(this.url);
     if (uri == null ||
         uri.scheme != 'https' ||
         uri.host.isEmpty ||
@@ -18,7 +23,7 @@ class SupabaseConfiguration {
         uri.hasQuery ||
         uri.hasFragment ||
         (uri.path.isNotEmpty && uri.path != '/') ||
-        !_clientKey(anonKey)) {
+        !_clientKey(this.anonKey)) {
       throw const AuthFailure(AuthProblem.configuration);
     }
   }
@@ -219,9 +224,11 @@ enum AccessMode { signedOut, authenticated, demo, recovery }
 class AuraAuthController extends ChangeNotifier implements AccessTokenProvider {
   AuraAuthController({
     this.gateway,
+    this.startupFailure,
     DateTime Function()? clock,
     this.operationTimeout = const Duration(seconds: 20),
   }) : _clock = clock ?? DateTime.now {
+    error = startupFailure?.message;
     final restored = gateway?.session;
     if (restored != null && restored.emailVerified) {
       mode = AccessMode.authenticated;
@@ -236,6 +243,7 @@ class AuraAuthController extends ChangeNotifier implements AccessTokenProvider {
   }
 
   final AuthGateway? gateway;
+  final AuthFailure? startupFailure;
   final DateTime Function() _clock;
   final Duration operationTimeout;
   StreamSubscription<AuthUpdate>? _subscription;
@@ -318,7 +326,8 @@ class AuraAuthController extends ChangeNotifier implements AccessTokenProvider {
     if (busy || _disposed) return;
     final service = gateway;
     if (service == null) {
-      error = const AuthFailure(AuthProblem.configuration).message;
+      error = (startupFailure ?? const AuthFailure(AuthProblem.configuration))
+          .message;
       _notify();
       return;
     }
@@ -460,25 +469,46 @@ class AuraAuthController extends ChangeNotifier implements AccessTokenProvider {
   }
 }
 
-Future<AuraAuthController> initializeAuthentication() async {
+Future<AuthGateway> _initializeSupabaseGateway(
+  SupabaseConfiguration config,
+) async {
+  final supabase = await Supabase.initialize(
+    url: config.url,
+    publishableKey: config.anonKey,
+    debug: false,
+    authOptions: FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+      autoRefreshToken: true,
+      detectSessionInUriPredicate: (uri) =>
+          (uri.scheme == 'auracare' && uri.host == 'auth-callback') ||
+          (uri.scheme == 'org.auracare.auracare_mobile_app' &&
+              uri.host == 'auth' &&
+              uri.path == '/callback'),
+    ),
+  );
+  return SupabaseAuthGateway(supabase.client);
+}
+
+Future<AuraAuthController> initializeAuthentication({
+  SupabaseConfiguration Function()? configurationFactory,
+  Future<AuthGateway> Function(SupabaseConfiguration)? gatewayInitializer,
+}) async {
+  late final SupabaseConfiguration config;
   try {
-    final config = SupabaseConfiguration.fromEnvironment();
-    final supabase = await Supabase.initialize(
-      url: config.url,
-      publishableKey: config.anonKey,
-      debug: false,
-      authOptions: FlutterAuthClientOptions(
-        authFlowType: AuthFlowType.pkce,
-        autoRefreshToken: true,
-        detectSessionInUriPredicate: (uri) =>
-            (uri.scheme == 'auracare' && uri.host == 'auth-callback') ||
-            (uri.scheme == 'org.auracare.auracare_mobile_app' &&
-                uri.host == 'auth' &&
-                uri.path == '/callback'),
-      ),
-    );
-    return AuraAuthController(gateway: SupabaseAuthGateway(supabase.client));
+    config = (configurationFactory ?? SupabaseConfiguration.fromEnvironment)();
   } catch (_) {
-    return AuraAuthController();
+    return AuraAuthController(
+      startupFailure: const AuthFailure(AuthProblem.configuration),
+    );
+  }
+  try {
+    final gateway = await (gatewayInitializer ?? _initializeSupabaseGateway)(
+      config,
+    );
+    return AuraAuthController(gateway: gateway);
+  } catch (_) {
+    return AuraAuthController(
+      startupFailure: const AuthFailure(AuthProblem.unavailable),
+    );
   }
 }

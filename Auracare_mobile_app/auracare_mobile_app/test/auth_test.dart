@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:auracare_mobile_app/app/auth_root.dart';
 import 'package:auracare_mobile_app/app/session.dart';
 import 'package:auracare_mobile_app/app/controller_auth_service.dart';
+import 'package:auracare_mobile_app/app/auth_service.dart' as ui;
 import 'package:auracare_mobile_app/data/api_client.dart';
 import 'package:auracare_mobile_app/data/auth_service.dart';
 import 'package:auracare_mobile_app/features/auth/auth_page.dart';
@@ -84,6 +85,107 @@ class FakeAuth implements AuthGateway {
 }
 
 void main() {
+  testWidgets(
+    'startup network failure is not presented as missing configuration',
+    (tester) async {
+      final controller = AuraAuthController(
+        startupFailure: const AuthFailure(AuthProblem.unavailable),
+      );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(AuthenticationRoot(auth: controller));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(const AuthFailure(AuthProblem.unavailable).message),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Account sign-in is not configured in this build'),
+        findsNothing,
+      );
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  test(
+    'startup rejects missing configuration before initializing Supabase',
+    () async {
+      var initialized = false;
+      final controller = await initializeAuthentication(
+        configurationFactory: () => SupabaseConfiguration(url: '', anonKey: ''),
+        gatewayInitializer: (_) async {
+          initialized = true;
+          return FakeAuth();
+        },
+      );
+      addTearDown(controller.dispose);
+      expect(initialized, isFalse);
+      expect(controller.configured, isFalse);
+      expect(controller.startupFailure?.problem, AuthProblem.configuration);
+      expect(await controller.accessToken(), isNull);
+    },
+  );
+
+  test(
+    'SDK startup failure stays distinct from missing configuration',
+    () async {
+      final controller = await initializeAuthentication(
+        configurationFactory: () => SupabaseConfiguration(
+          url: 'https://synthetic.supabase.co',
+          anonKey: 'sb_publishable_synthetic_key_only',
+        ),
+        gatewayInitializer: (_) async => throw StateError('private SDK detail'),
+      );
+      addTearDown(controller.dispose);
+      expect(controller.startupFailure?.problem, AuthProblem.unavailable);
+      expect(controller.error, isNot(contains('private')));
+      await expectLater(
+        ControllerAuthService(controller).signInWithPassword(
+          email: 'synthetic@example.com',
+          password: 'synthetic-password',
+        ),
+        throwsA(
+          isA<ui.AuthException>().having(
+            (e) => e.failure,
+            'failure',
+            ui.AuthFailure.network,
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'configured startup normalizes public values and restores one gateway',
+    () async {
+      final gateway = FakeAuth()
+        ..session = UserSession(
+          userId: 'synthetic-user',
+          token: 'synthetic-token',
+          emailVerified: true,
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        );
+      addTearDown(gateway.events.close);
+      var calls = 0;
+      final controller = await initializeAuthentication(
+        configurationFactory: () => SupabaseConfiguration(
+          url: '  https://synthetic.supabase.co  ',
+          anonKey: ' sb_publishable_synthetic_key_only ',
+        ),
+        gatewayInitializer: (config) async {
+          calls++;
+          expect(config.url, 'https://synthetic.supabase.co');
+          expect(config.anonKey, 'sb_publishable_synthetic_key_only');
+          return gateway;
+        },
+      );
+      addTearDown(controller.dispose);
+      expect(calls, 1);
+      expect(controller.configured, isTrue);
+      expect(controller.mode, AccessMode.authenticated);
+      expect(await controller.accessToken(), 'synthetic-token');
+    },
+  );
+
   late FakeAuth gateway;
   late AuraAuthController auth;
   setUp(() {

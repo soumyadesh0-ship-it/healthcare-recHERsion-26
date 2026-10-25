@@ -127,15 +127,15 @@ void main() {
       await tester.pump(const Duration(seconds: 4));
       expect(cues, [BreathCue.inhale, BreathCue.exhale]);
       await tester.pump(const Duration(milliseconds: 120));
-      expect(cues, [BreathCue.inhale, BreathCue.exhale, BreathCue.exhale]);
+      expect(cues, [BreathCue.inhale, BreathCue.exhale]);
       await tester.pump(const Duration(seconds: 1));
-      expect(cues.length, 3);
+      expect(cues.length, 2);
       await tester.tap(find.text('Pause breathing'));
       await tester.pump();
       expect(cues.last, BreathCue.pause);
       await tester.tap(find.text('Resume breathing'));
       await tester.pump();
-      expect(cues.last, BreathCue.exhale);
+      expect(cues.last, BreathCue.pause);
       final count = cues.length;
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump(const Duration(seconds: 1));
@@ -167,7 +167,7 @@ void main() {
     haptics.cancel();
   });
   testWidgets(
-    'haptic completion and explicit reset cancel pending exhale pulse',
+    'exhale has one pulse and explicit cancellation leaves none scheduled',
     (tester) async {
       final cues = <BreathCue>[];
       final haptics = BreathHaptics(pulse: (cue) async => cues.add(cue));

@@ -174,7 +174,7 @@ void main() {
     await tester.runAsync(() => session.records.save(journal()));
     await tester.tap(find.byKey(const ValueKey('open-drawer')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Profile'));
+    await tester.tap(find.byKey(const ValueKey('profile-footer')));
     await tester.pumpAndSettle();
     auth.pendingSignOut = Completer<void>();
     await tapText(tester, 'Sign out / exit demo');
@@ -406,7 +406,7 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('open-drawer')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Profile'));
+      await tester.tap(find.byKey(const ValueKey('profile-footer')));
       await tester.pumpAndSettle();
       expect(find.text('Signed in as alex@example.com'), findsOneWidget);
       expect(

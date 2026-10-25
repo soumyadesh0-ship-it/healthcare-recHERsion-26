@@ -116,6 +116,9 @@ enum RecordProblem {
   unavailable,
   authentication,
   deployment,
+  configuration,
+  schema,
+  permission,
   busy,
 }
 
@@ -139,6 +142,9 @@ class RecordFailure extends StateError {
         RecordProblem.authentication =>
           'Please sign in again to access your health records.',
         RecordProblem.deployment => 'Cloud health records are not enabled. Database deployment and validation are required.',
+        RecordProblem.configuration => 'Cloud health-record configuration is unavailable. Sign-in and record access need the same public Supabase settings.',
+        RecordProblem.schema => 'The cloud health-record schema is unavailable or incompatible. Database deployment must be verified before records can be loaded or saved.',
+        RecordProblem.permission => 'Health-record access is not permitted for this account. Database permissions need verification.',
         RecordProblem.busy =>
           'A record operation is already in progress. Please wait and retry.',
       });

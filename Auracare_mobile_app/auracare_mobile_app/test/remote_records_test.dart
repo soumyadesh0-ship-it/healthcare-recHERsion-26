@@ -603,6 +603,79 @@ void main() {
     expect(requests.length, count);
   });
 
+  test('enabled storage with no configuration differs from the closed deployment gate', () async {
+    final enabled = RemoteRecordsRepository(
+      transport: null,
+      enabled: true,
+      isCurrentSession: () => true,
+    );
+    final gated = RemoteRecordsRepository(
+      transport: null,
+      enabled: false,
+      isCurrentSession: () => true,
+    );
+    addTearDown(enabled.dispose);
+    addTearDown(gated.dispose);
+    await enabled.load();
+    await gated.load();
+    expect(enabled.loaded, isFalse);
+    expect(enabled.loadError, contains('configuration'));
+    expect(gated.loadError, contains('Database deployment'));
+    await expectLater(
+      enabled.save(fixture()),
+      throwsA(problem(RecordProblem.configuration)),
+    );
+    await expectLater(
+      gated.save(fixture()),
+      throwsA(problem(RecordProblem.deployment)),
+    );
+  });
+
+  test('missing schema and permission failures do not masquerade as a disabled flag', () async {
+    final gateway = FakeAuth();
+    final auth = AuraAuthController(gateway: gateway, clock: () => now);
+    addTearDown(auth.dispose);
+    addTearDown(gateway.events.close);
+    await auth.signIn('synthetic@example.com', 'synthetic-password');
+    for (final failure in [
+      (404, '{}', RecordProblem.schema),
+      (
+        400,
+        '{"code":"PGRST204","message":"private schema detail"}',
+        RecordProblem.schema,
+      ),
+      (
+        400,
+        '{"code":"42703","message":"private schema detail"}',
+        RecordProblem.schema,
+      ),
+      (
+        403,
+        '{"message":"private permission detail"}',
+        RecordProblem.permission,
+      ),
+    ]) {
+      final transport = SupabaseHealthTransport(
+        config: SupabaseConfiguration(
+          url: 'https://synthetic.invalid',
+          anonKey: 'sb_publishable_synthetic_key_only',
+        ),
+        auth: auth,
+        owner: 'synthetic-user',
+        client: MockClient((_) async => http.Response(failure.$2, failure.$1)),
+      );
+      try {
+        await expectLater(
+          transport.read('journal_entries'),
+          throwsA(problem(failure.$3)),
+        );
+        expect(auth.mode, AccessMode.authenticated);
+      } finally {
+        transport.close();
+      }
+    }
+  });
+
   for (final status in [401, 403, 404, 409, 500]) {
     test('PostgREST $status is mapped to a safe failure', () async {
       final gateway = FakeAuth();

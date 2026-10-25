@@ -9,7 +9,10 @@ ModelQuizService? configuredModelQuizService(
   AuthService auth,
   http.Client client,
 ) {
-  const base = String.fromEnvironment('AURACARE_API_BASE_URL');
+  const base = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: String.fromEnvironment('AURACARE_API_BASE_URL'),
+  );
   if (base.trim().isEmpty || auth is! AccessTokenProvider) return null;
   try {
     return AuthenticatedModelQuizService(
