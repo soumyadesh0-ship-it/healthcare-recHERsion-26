@@ -1,0 +1,36 @@
+{
+  "note": "Different-source stress test of an ablated seven-feature model; NOT external validation of the main eight-feature quiz. Clinical label provenance remains unverified.",
+  "feature_semantics_warning": "Clinical hair growth/skin darkening fields may use clinician assessments; survey fields are self-reported. No period code mapping assumed.",
+  "features": [
+    "age",
+    "bmi",
+    "weight_gain",
+    "excess_hair",
+    "skin_darkening",
+    "hair_thinning",
+    "acne"
+  ],
+  "fitted_on": "survey development only",
+  "parameters": {
+    "model__max_depth": null,
+    "model__min_samples_leaf": 3
+  },
+  "clinical_rows_available": 536,
+  "identical_survey_profiles_excluded": 1,
+  "metrics": {
+    "n": 535,
+    "positive_labels": 174,
+    "accuracy": 0.7177570093457943,
+    "precision": 0.896551724137931,
+    "sensitivity": 0.14942528735632185,
+    "specificity": 0.9916897506925207,
+    "f1": 0.2561576354679803,
+    "roc_auc": 0.8154392332919413,
+    "average_precision": 0.7152790283225142,
+    "brier_score": 0.17510023494385696,
+    "tn": 358,
+    "fp": 3,
+    "fn": 148,
+    "tp": 26
+  }
+}

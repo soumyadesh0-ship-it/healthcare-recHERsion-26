@@ -1,0 +1,14 @@
+{
+  "status": "experimental_result",
+  "model": "random_forest",
+  "experimental_model_score": 0.79225,
+  "score_target": "self_reported_prior_pcos_diagnosis_in_training_sample",
+  "bmi_imputed": false,
+  "reported_symptoms": [
+    "weight_gain",
+    "excess_hair",
+    "acne",
+    "irregular_periods"
+  ],
+  "message": "Experimental symptom summary. This score cannot diagnose or rule out PCOS and is not your clinical probability of PCOS. Discuss persistent concerns with a qualified healthcare professional."
+}

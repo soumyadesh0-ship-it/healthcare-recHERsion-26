@@ -1,0 +1,5 @@
+{
+  "selected_model": "random_forest",
+  "criterion": "Nested development OOF average precision",
+  "threshold": 0.5
+}

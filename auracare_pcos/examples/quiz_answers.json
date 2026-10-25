@@ -1,0 +1,11 @@
+{
+  "age": 24,
+  "bmi": 23.5,
+  "regular_periods": 0,
+  "weight_gain": 1,
+  "excess_hair": 1,
+  "skin_darkening": 0,
+  "hair_thinning": 0,
+  "acne": 1,
+  "known_pcos_diagnosis": false
+}

@@ -1,0 +1,77 @@
+Nested development validation: random_forest
+  Fold 1/5 complete
+  Fold 2/5 complete
+  Fold 3/5 complete
+  Fold 4/5 complete
+  Fold 5/5 complete
+Nested development validation: logistic_regression
+  Fold 1/5 complete
+  Fold 2/5 complete
+  Fold 3/5 complete
+  Fold 4/5 complete
+  Fold 5/5 complete
+Selected before test: random_forest
+Running separate seven-feature transfer stress test
+{
+  "selected": "random_forest",
+  "split": {
+    "development_n": 338,
+    "development_positive": 75,
+    "test_n": 85,
+    "test_positive": 19,
+    "development_groups": 337,
+    "test_groups": 84,
+    "group_overlap": 0
+  },
+  "holdout": {
+    "random_forest": {
+      "n": 85,
+      "positive_labels": 19,
+      "accuracy": 0.9058823529411765,
+      "precision": 0.9230769230769231,
+      "sensitivity": 0.631578947368421,
+      "specificity": 0.9848484848484849,
+      "f1": 0.75,
+      "roc_auc": 0.8995215311004785,
+      "average_precision": 0.8531174666949475,
+      "brier_score": 0.08540635976840777,
+      "tn": 65,
+      "fp": 1,
+      "fn": 7,
+      "tp": 12
+    },
+    "logistic_regression": {
+      "n": 85,
+      "positive_labels": 19,
+      "accuracy": 0.8705882352941177,
+      "precision": 0.9,
+      "sensitivity": 0.47368421052631576,
+      "specificity": 0.9848484848484849,
+      "f1": 0.6206896551724138,
+      "roc_auc": 0.8891547049441786,
+      "average_precision": 0.8317336762913576,
+      "brier_score": 0.08851964680751849,
+      "tn": 65,
+      "fp": 1,
+      "fn": 10,
+      "tp": 9
+    },
+    "constant_prior_baseline": {
+      "n": 85,
+      "positive_labels": 19,
+      "accuracy": 0.7764705882352941,
+      "precision": 0.0,
+      "sensitivity": 0.0,
+      "specificity": 1.0,
+      "f1": 0.0,
+      "roc_auc": 0.5,
+      "average_precision": 0.2235294117647059,
+      "brier_score": 0.17356669007717232,
+      "tn": 66,
+      "fp": 0,
+      "fn": 19,
+      "tp": 0
+    }
+  },
+  "seconds": 28.33
+}

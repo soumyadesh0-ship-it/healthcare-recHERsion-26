@@ -1,0 +1,41 @@
+{
+  "original_rows": 465,
+  "exact_duplicate_rows_removed": 1,
+  "excluded_outside_age_18_45_or_unknown": 41,
+  "excluded_invalid_label": 0,
+  "bmi_set_missing_due_to_ambiguous_or_invalid_measurements": 4,
+  "bmi_policy": "Recompute from valid kg/cm only; ambiguous units remain missing; no guessed conversions.",
+  "regularity_vs_month_interval_disagreements": 33,
+  "period_policy": "Use direct regular-periods answer; exclude interval and bleeding-duration fields. Disagreements retained and reported.",
+  "conflicting_predictor_groups_retained": 0,
+  "retained_rows": 423,
+  "positive_labels": 94,
+  "negative_labels": 329,
+  "missing_by_feature": {
+    "age": 0,
+    "bmi": 4,
+    "regular_periods": 0,
+    "weight_gain": 0,
+    "excess_hair": 0,
+    "skin_darkening": 0,
+    "hair_thinning": 0,
+    "acne": 0
+  },
+  "raw_file_sha256": {
+    "CLEAN- PCOS SURVEY SPREADSHEET.csv": "636ee658928d33afc89ec1d60a2c7c3569a8515cb1fb6f90d52f9a6b7ee2033b",
+    "PCOS-Data.csv": "bc3ab1f06696970195cb2259c48661dfd73f24d3656538d6bc2a6de28ad032a9",
+    "PCOS_data.csv": "179b3c8eff6968394af63e19e23732eaa0f162190628012072969f4a1df42f79",
+    "allData.csv": "9f34142eb0831d9e3936e58d1f3094124e6a1d9066a78c314d957c2c828ec540",
+    "cleaned_pcos_data.csv": "c664178b3dc7cee33fa3a39ad6b1ccdf3a095bec035f93ad0ecddc177a6d9186",
+    "pcos_dataset.csv": "a908b5bc7a7b3418fd30d47fd052942373e98c3666dff70102db654ff140e52e"
+  },
+  "main_training_source": "CLEAN- PCOS SURVEY SPREADSHEET.csv",
+  "clinical_used_only_for_separate_transfer_stress_test": true,
+  "not_pooled": [
+    "cleaned clinical repeats",
+    "ambiguous-class 125-record survey",
+    "allData: incompatible categories",
+    "1000-record lab-based dataset",
+    "image archive"
+  ]
+}
