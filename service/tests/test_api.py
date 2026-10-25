@@ -48,7 +48,7 @@ def test_startup_trims_config_without_initializing_services(backend):
     with TestClient(backend.api.app):
         assert backend.api.app.state.supabase_url == "https://synthetic-project.invalid"
     backend.api.create_client.assert_not_called()
-    backend.api.genai.Client.assert_not_called()
+    backend.api.OpenAI.assert_not_called()
 
 
 @pytest.mark.parametrize("body", [None, [], {}, {"prompt": ""}, {"prompt": "   "},
@@ -62,44 +62,44 @@ def test_chat_validation(client, backend, supabase, body):
     assert response.json() == {"detail": "Invalid request. Check the documented field types and limits."}
     assert "synthetic-private-marker" not in response.text
     assert response.headers["cache-control"] == "no-store"
-    backend.api.genai.Client.assert_not_called()
+    backend.api.OpenAI.assert_not_called()
 
 
 @pytest.mark.parametrize("prompt", ["  synthetic question  ", "x" * 10000])
-def test_chat_authenticated_success(client, backend, supabase, gemini, prompt):
+def test_chat_authenticated_success(client, backend, supabase, openai_client, prompt):
     response = client.post("/chat", json={"prompt": prompt, "ai_processing_confirmed": True}, headers=AUTH)
     assert response.status_code == 200
     assert response.json() == {"response": "Synthetic wellness information."}
     assert response.headers["cache-control"] == "no-store"
-    options = backend.api.genai.Client.call_args.kwargs
-    assert options["api_key"] == "FAKE_GEMINI_KEY"
-    assert options["http_options"].timeout == 30000
-    assert options["http_options"].retry_options.attempts == 1
+    options = backend.api.OpenAI.call_args.kwargs
+    assert options["api_key"] == "FAKE_OPENAI_KEY"
+    assert options["timeout"] == 30
+    assert options["max_retries"] == 0
     supabase.auth.get_user.assert_called_once_with("synthetic-token-a")
     supabase.table.assert_not_called()
-    kwargs = gemini.models.generate_content.call_args.kwargs
-    assert kwargs["contents"] == prompt.strip()
-    assert kwargs["model"] == "gemini-2.5-flash"
-    assert kwargs["config"].system_instruction == backend.api.CHAT_SYSTEM_INSTRUCTION
-    assert kwargs["config"].max_output_tokens == 2048
-    gemini.__exit__.assert_called_once()
+    kwargs = openai_client.chat.completions.create.call_args.kwargs
+    assert kwargs["messages"][1] == {"role": "user", "content": prompt.strip()}
+    assert kwargs["model"] == "gpt-4o-mini"
+    assert kwargs["messages"][0] == {"role": "system", "content": backend.api.CHAT_SYSTEM_INSTRUCTION}
+    assert kwargs["max_completion_tokens"] == 2048
+    openai_client.__exit__.assert_called_once()
 
 
 @pytest.mark.parametrize("text", [None, "", "  \n"])
-def test_chat_empty_upstream_response(client, supabase, gemini, text):
-    gemini.models.generate_content.return_value.text = text
+def test_chat_empty_upstream_response(client, supabase, openai_client, text):
+    openai_client.chat.completions.create.return_value.choices[0].message.content = text
     response = client.post("/chat", json={"prompt": "synthetic question", "ai_processing_confirmed": True}, headers=AUTH)
     assert response.status_code == 502
     assert response.headers["cache-control"] == "no-store"
 
 
 @pytest.mark.parametrize("stage", ["construct", "generate"])
-def test_chat_sanitizes_raw_exception(client, backend, supabase, gemini, stage):
+def test_chat_sanitizes_raw_exception(client, backend, supabase, openai_client, stage):
     error = RuntimeError("SYNTHETIC_PRIVATE_UPSTREAM_DETAIL")
     if stage == "construct":
-        backend.api.genai.Client.side_effect = error
+        backend.api.OpenAI.side_effect = error
     else:
-        gemini.models.generate_content.side_effect = error
+        openai_client.chat.completions.create.side_effect = error
     response = client.post("/chat", json={"prompt": "synthetic question", "ai_processing_confirmed": True}, headers=AUTH)
     assert response.status_code == 502
     assert "SYNTHETIC_PRIVATE_UPSTREAM_DETAIL" not in response.text
@@ -260,3 +260,10 @@ def test_user_authentication_context_is_isolated(client, backend, concurrent):
     # A later unauthenticated request must not inherit either successful session.
     assert client.post("/predict-pcos", json=FULL).status_code == 401
     assert backend.api.create_client.call_count == 2
+
+
+def test_chat_missing_choices(client, supabase, openai_client):
+    openai_client.chat.completions.create.return_value.choices = []
+    response = client.post("/chat", json={"prompt": "synthetic question", "ai_processing_confirmed": True}, headers=AUTH)
+    assert response.status_code == 502
+    assert response.headers["cache-control"] == "no-store"

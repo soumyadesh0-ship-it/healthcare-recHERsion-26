@@ -16,10 +16,8 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from google import genai
-from google.genai import types
+from openai import OpenAI, APIConnectionError, APIError, APIStatusError
 import httpx
-from google.genai import errors as genai_errors
 from pydantic import BaseModel, ConfigDict, StrictBool, StringConstraints
 from supabase import ClientOptions, create_client
 from supabase_auth.errors import AuthApiError
@@ -29,7 +27,7 @@ load_dotenv()
 
 METHOD_VERSION = "survey-count-v1"
 SUPABASE_TIMEOUT_SECONDS = 10
-GEMINI_TIMEOUT_MS = 30000
+OPENAI_TIMEOUT_SECONDS = 30
 
 
 class ChatRateLimiter:
@@ -61,7 +59,7 @@ class ChatRateLimiter:
 
 
 CHAT_SYSTEM_INSTRUCTION = """
-You are AuraCare, an AI assistant providing helpful, respectful general health
+You are AuraCare, an AI assistant providing supportive, empathetic, respectful general health
 and wellness information. Clearly identify yourself as an AI assistant, not a
 doctor. Explain uncertainty and limitations in plain language. Explicitly advise
 users to consult a certified doctor for formal diagnoses, treatment decisions,
@@ -201,28 +199,30 @@ def chat(message: ChatRequest, request: Request,
     user: Annotated[AuthenticatedUser, Depends(authenticated_user)]):
     if not message.ai_processing_confirmed:
         raise HTTPException(403, "Confirm sending this prompt to the AI service before continuing.")
-    key = os.getenv("GEMINI_API_KEY", "").strip()
+    key = os.getenv("OPENAI_API_KEY", "").strip()
     if not key:
         raise HTTPException(503, "The AI service is temporarily unavailable.")
     request.app.state.chat_limiter.check(user.user_id)
     try:
-        client = genai.Client(api_key=key, http_options=types.HttpOptions(
-            timeout=GEMINI_TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=1)))
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"),
+            timeout=OPENAI_TIMEOUT_SECONDS, max_retries=0)
         with client:
-            result = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=message.prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=CHAT_SYSTEM_INSTRUCTION,
-                    max_output_tokens=2048,
-                ),
+            result = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": CHAT_SYSTEM_INSTRUCTION},
+                    {"role": "user", "content": message.prompt},
+                ],
+                max_completion_tokens=2048,
             )
-            text = result.text
-    except (httpx.TimeoutException, httpx.NetworkError):
+            text = result.choices[0].message.content if result.choices else None
+    except (APIConnectionError, httpx.TimeoutException, httpx.NetworkError):
         raise HTTPException(503, "The AI service is temporarily unavailable.") from None
-    except genai_errors.APIError as exc:
-        status = 503 if exc.code == 429 or exc.code >= 500 else 502
+    except APIStatusError as exc:
+        status = 503 if exc.status_code == 429 or exc.status_code >= 500 else 502
         raise HTTPException(status, "The AI service could not complete the request.") from None
+    except APIError:
+        raise HTTPException(502, "The AI service could not complete the request.") from None
     except Exception:
         raise HTTPException(502, "The AI service could not complete the request.") from None
     if not isinstance(text, str) or not text.strip():

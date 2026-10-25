@@ -16,7 +16,7 @@ loopback connection inside Windows' socketpair implementation, used by asyncio's
 internal wakeup pipe. TestClient uses its in-process ASGI transport.
 
 No database is contacted and these tests do not verify deployed RLS, migration
-application, clinical safety, or Gemini output quality. The concurrency tests
+application, clinical safety, or OpenAI output quality. The concurrency tests
 verify per-request client/token isolation against synthetic Supabase clients.
 
 ## Security coverage and remaining limits

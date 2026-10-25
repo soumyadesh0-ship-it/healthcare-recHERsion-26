@@ -50,12 +50,12 @@ def backend(monkeypatch, offline):
     config = {
         "SUPABASE_URL": "https://synthetic-project.invalid",
         "SUPABASE_ANON_KEY": "FAKE_ANON_KEY",
-        "GEMINI_API_KEY": "FAKE_GEMINI_KEY",
+        "OPENAI_API_KEY": "FAKE_OPENAI_KEY",
     }
     # Replace main's os reference, not the real process environment or os.getenv.
     monkeypatch.setattr(module, "os", SimpleNamespace(getenv=config.get))
     monkeypatch.setattr(module, "create_client", Mock(side_effect=AssertionError("Unexpected Supabase call")))
-    monkeypatch.setattr(module.genai, "Client", Mock(side_effect=AssertionError("Unexpected Gemini call")))
+    monkeypatch.setattr(module, "OpenAI", Mock(side_effect=AssertionError("Unexpected OpenAI call")))
     return SimpleNamespace(api=module, config=config)
 
 
@@ -80,11 +80,11 @@ def supabase(backend):
 
 
 @pytest.fixture
-def gemini(backend):
+def openai_client(backend):
     fake = Mock()
     fake.__enter__ = Mock(return_value=fake)
     fake.__exit__ = Mock(return_value=False)
-    fake.models.generate_content.return_value = SimpleNamespace(text="  Synthetic wellness information.  ")
-    backend.api.genai.Client.side_effect = None
-    backend.api.genai.Client.return_value = fake
+    fake.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="  Synthetic wellness information.  "))])
+    backend.api.OpenAI.side_effect = None
+    backend.api.OpenAI.return_value = fake
     return fake
