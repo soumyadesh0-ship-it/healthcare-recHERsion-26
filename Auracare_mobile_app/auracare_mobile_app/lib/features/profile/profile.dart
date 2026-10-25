@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/auth_service.dart';
 import '../../app/session.dart';
 import '../../core/widgets.dart';
 import '../../core/characters.dart';
@@ -8,10 +9,15 @@ import '../timeline/timeline.dart';
 import '../cycle/cycle.dart';
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, this.onSignOut, this.authUser});
+  final Future<void> Function()? onSignOut;
+  final AuthUser? authUser;
+
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
+    final displayName =
+        authUser?.displayName ?? authUser?.email?.split('@').first ?? 'Alex';
     return ListView(
       key: const PageStorageKey('profile'),
       padding: const EdgeInsets.all(20),
@@ -23,21 +29,37 @@ class ProfilePage extends StatelessWidget {
             child: Character(kind: AuraCharacter.flower, size: 78),
           ),
         ),
-        const Center(child: Heading('Alex')),
-        const Center(child: Text('Fictional demo profile')),
+        Center(child: Heading(displayName)),
+        Center(
+          child: Text(
+            authUser == null
+                ? 'Fictional demo profile'
+                : 'Signed in as ${authUser!.email ?? displayName}',
+          ),
+        ),
+        if (authUser != null)
+          const Text(
+            'Health records in this app remain local to this session and are not uploaded to your account.',
+          ),
         const Divider(),
         ExpansionTile(
           title: const Text('About this demo'),
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text(
-                'Alex · fictional demo profile\nSession only. Health records clear when the app restarts. Onboarding completion is remembered on Android. No account, cloud storage, encryption or legal compliance is claimed.',
+                authUser == null
+                    ? 'Alex · fictional demo profile\nSession only. Health records clear when the app restarts. Onboarding completion is remembered on Android. No account, cloud storage, encryption or legal compliance is claimed.'
+                    : 'This signed-in account is used only for authentication. Health records are synthetic, stay in this app session, clear when the app restarts, and are not uploaded or linked to your account.',
               ),
             ),
           ],
         ),
-        const Text('Account connection coming later'),
+        Text(
+          authUser == null
+              ? 'Account connection is unavailable in this demo.'
+              : 'AuraCare account authentication is connected.',
+        ),
         const Divider(),
         ExpansionTile(
           title: const Text('Tracking & display'),
@@ -187,6 +209,20 @@ class ProfilePage extends StatelessWidget {
         const Text(
           'Self-care suggestions, reminders, account privacy lifecycles, uploads, reports, AI, moderation and live provider services await reviewed implementations.',
         ),
+        if (onSignOut != null)
+          OutlinedButton.icon(
+            onPressed: () async {
+              try {
+                await onSignOut!();
+              } on AuthException catch (exception) {
+                if (context.mounted) {
+                  tell(context, authFailureMessage(exception.failure));
+                }
+              }
+            },
+            icon: const Icon(Icons.logout),
+            label: const Text('Sign out / exit demo'),
+          ),
       ]),
     );
   }

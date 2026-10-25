@@ -39,21 +39,29 @@ void main() {
       await tester.tap(find.text('Skip'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('Start empty demo'),
+        find.text('Continue to login'),
         240,
         scrollable: find.byType(Scrollable).last,
       );
-      await tester.tap(find.text('Start empty demo'));
+      await tester.tap(find.text('Continue to login'));
       await tester.pumpAndSettle();
       expect(completed, isTrue);
+      expect(find.text('Welcome to AuraCare'), findsOneWidget);
+      await tester.ensureVisible(find.text('Continue in demo mode'));
+      await tester.tap(find.text('Continue in demo mode'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start empty'));
+      await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(const AuracareApp());
       await tester.pumpAndSettle();
-      expect(find.widgetWithText(FilledButton, 'Continue'), findsOneWidget);
-      await tester.ensureVisible(find.text('Continue'));
-      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      expect(find.text('Welcome to AuraCare'), findsOneWidget);
+      await tester.ensureVisible(find.text('Continue in demo mode'));
+      await tester.tap(find.text('Continue in demo mode'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start empty'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
       expect(find.text('Get started'), findsNothing);

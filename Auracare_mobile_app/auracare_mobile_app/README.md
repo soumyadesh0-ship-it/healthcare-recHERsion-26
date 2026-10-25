@@ -6,28 +6,60 @@ Phase 3 features, data handling, sources and verification: [Cycle estimates, Doc
 
 Current UI refinements, logo assets, changed files and device/test results: [AuraCare refinement](../../docs/AURACARE_REFINEMENT.md).
 
-Flutter/Dart mobile UI with a shared in-memory synthetic session. No real account, secure persistence, health uploads, model, AI service, community or provider integration is connected. Do not enter real health information. Android remembers first-run onboarding completion using a native SharedPreferences flag. Health records and other session preferences remain in memory; restarting starts with empty records. Samples are loaded only through an explicit demo action. No sensitive-text storage package is used.
+Flutter/Dart mobile app using the team's existing Supabase project for email/password authentication. Health records and other app data still use a shared in-memory synthetic session: they are not stored in the account or uploaded. Do not enter real health information. Android remembers first-run onboarding completion using a native SharedPreferences flag. Restarting starts with empty records. Samples are loaded only through the explicit demo action. The Supabase Flutter client persists authentication sessions locally; the app uses only the public project URL and publishable/anon key.
 
 Implemented: original flat geometric characters, white/pastel UI, welcome screen, three onboarding pages, sample/empty entry, Home/Timeline/Learn/Insights/Profile tabs, symptom/wellbeing/journal/bleeding record CRUD, date/type filters, optional cycle day selection, source-linked descriptive coverage, selected appointment preparation and clipboard summary, question management, synthetic JSON export/reset, and experimental PCOS quiz with fixture/failure/unavailable states. Learn topics are structural previews without invented articles or review credentials.
 
 ## Run
 
-Generated and checked with Flutter **3.47.8**, Dart **3.13.7**. The generated SDK constraint is preserved in pubspec.yaml; no packages were downgraded. Only Flutter SDK and standard Flutter test/lint tooling are dependencies.
+Generated and checked with Flutter **3.47.8**, Dart **3.13.7**. The generated SDK constraint is preserved in pubspec.yaml; no packages were downgraded. Runtime dependencies include Flutter and the official Supabase Flutter client; `http` is used only by isolated auth adapter tests.
 
 From this folder, with the Flutter SDK on PATH and an Android/iOS development device ready:
 
 ```powershell
 flutter pub get
-flutter run
 ```
+
+Configure the app with the same `SUPABASE_URL` and public `SUPABASE_ANON_KEY` used by `service/main.py`. From this folder, this PowerShell snippet reads only those two values from the repository-root `.env` without printing them:
+
+```powershell
+$settings = @{}
+Get-Content (Join-Path (Resolve-Path ..\..) '.env') | ForEach-Object {
+  if ($_ -match '^\s*(SUPABASE_URL|SUPABASE_ANON_KEY)\s*=\s*(.*?)\s*$') {
+    $settings[$Matches[1]] = $Matches[2].Trim().Trim('"').Trim("'")
+  }
+}
+if (-not $settings['SUPABASE_URL'] -or -not $settings['SUPABASE_ANON_KEY']) {
+  throw 'Both public Supabase client settings must be configured.'
+}
+flutter run `
+  --dart-define="SUPABASE_URL=$($settings['SUPABASE_URL'])" `
+  --dart-define="SUPABASE_ANON_KEY=$($settings['SUPABASE_ANON_KEY'])" `
+  --dart-define="AURACARE_AUTH_REDIRECT_URL=auracare://auth-callback"
+```
+
+If `.env` is unavailable, obtain the project URL and publishable/anon key from the existing Supabase project and pass them as `--dart-define` values. Never use a service-role/secret key. Without both Dart defines the app intentionally shows the unavailable-provider state instead of attempting authentication.
+
+#### Supabase Auth dashboard setup
+
+- Use the existing project referenced by the backend configuration; do not create another project.
+- Add `auracare://auth-callback` to **Authentication → URL Configuration → Redirect URLs**. Android registers this URI in `android/app/src/main/AndroidManifest.xml`.
+- Enable email/password signup. If email confirmation is enabled, configure delivery (SMTP/email templates) and verify that the confirmation link redirects to `auracare://auth-callback`. The app keeps the user at login until Supabase confirms a session.
+- Configure the password-recovery email template to return to the same allowed redirect URI. Supabase Flutter handles the PKCE callback and the app then presents its new-password form.
+- Google OAuth is intentionally disabled: the repository contains no Google provider setup, OAuth client IDs, signing fingerprints, or official Google logo asset. To enable it, configure Google OAuth in Google Cloud and Supabase Auth, register the Android package `org.auracare.auracare_mobile_app` and its signing SHA fingerprints, add the required redirect URI to Supabase, and provide an official Google logo asset. Do not put OAuth client secrets in the app.
+
+The existing `public.profiles` table has `id` tied to `auth.users` and an optional `display_name` limited to 100 characters; its RLS permits users to access only their own row. There is no profile-creation trigger. Registration sends the validated full name as Supabase Auth user metadata under `display_name` and the app reads it for the signed-in profile; this implementation does not add a migration or write a profile row. The backend's existing token verification remains unchanged.
+
+Authentication is separate from demo data. On entry to a real account, previous local demo/session records are cleared. The Home and feature UI continues to use session-only records; login does not upload or attach them to an account.
 
 On the audited Windows machine the SDK is outside PATH:
 
 ```powershell
 $env:Path = "C:\Users\Soumya\flutter\bin;$env:Path"
 flutter devices
-flutter run
 ```
+
+Then run the Supabase-configured command above so the public client configuration is included in the build.
 
 See [redesign verification](../../docs/AURACARE_REDESIGN.md) for the current UI changes and verification. The following notes describe the original implementation audit: Android Doctor reported missing command-line tools and unknown license status. The debug build attempt failed when Gradle's JVM exhausted memory; test runs also initially encountered full disk space. Free adequate disk/RAM and complete the Android toolchain before building. iOS requires macOS/Xcode; no iOS build was attempted on Windows. Signing/provisioning has not been customized.
 

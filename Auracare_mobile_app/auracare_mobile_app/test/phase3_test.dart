@@ -353,8 +353,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Skip'));
       await tester.pumpAndSettle();
-      await reveal(tester, find.text('Start empty demo'));
-      await tester.tap(find.text('Start empty demo'));
+      await reveal(tester, find.text('Continue to login'));
+      await tester.tap(find.text('Continue to login'));
       await tester.pumpAndSettle();
       expect(session.records.entries.map((e) => e.id), ids);
       expect(completed, isTrue);

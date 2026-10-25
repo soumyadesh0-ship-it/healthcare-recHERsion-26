@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../app/theme.dart';
+
 /// Cleaned lockup from the supplied logo reference, never stretched or clipped.
 class AuraLogo extends StatelessWidget {
   const AuraLogo({super.key, this.width = 260, this.wordmarkOnly = false});
@@ -17,6 +19,44 @@ class AuraLogo extends StatelessWidget {
         width: width,
         fit: BoxFit.contain,
         filterQuality: FilterQuality.high,
+      ),
+    ),
+  );
+}
+
+class AuraCareBrandHeader extends StatelessWidget {
+  const AuraCareBrandHeader({super.key});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'AuraCare',
+    child: ExcludeSemantics(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(
+            'assets/brand/auracare-icon.png',
+            width: 36,
+            height: 36,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+          const SizedBox(width: 9),
+          Flexible(
+            child: Text(
+              'auracare',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  Theme.of(context).appBarTheme.titleTextStyle ??
+                  const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Palette.ink,
+                  ),
+            ),
+          ),
+        ],
       ),
     ),
   );

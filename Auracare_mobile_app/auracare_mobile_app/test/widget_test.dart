@@ -89,7 +89,10 @@ void main() {
     await tester.pumpAndSettle();
     await tapText(tester, 'Back');
     await tapText(tester, 'Skip');
-    await tapText(tester, 'Start empty demo');
+    await tapText(tester, 'Continue to login');
+    expect(find.text('Welcome to AuraCare'), findsOneWidget);
+    await tapText(tester, 'Continue in demo mode');
+    await tapText(tester, 'Start empty');
     expect(find.text('Demo — sample data'), findsOneWidget);
     for (final tab in [
       'Timeline',
@@ -397,7 +400,9 @@ void main() {
         'Doctor',
         'Profile',
       ]) {
-        await tester.tap(find.byKey(ValueKey('tab-$tab')));
+        final destination = find.byKey(ValueKey('tab-$tab'));
+        await tester.ensureVisible(destination);
+        await tester.tap(destination);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'Active tab: $tab');
       }
