@@ -7,8 +7,9 @@ import '../../core/characters.dart';
 import '../../core/brand.dart';
 
 class Onboarding extends StatefulWidget {
-  const Onboarding({super.key, required this.onEnter});
+  const Onboarding({super.key, required this.onEnter, this.demoEntry = false});
   final ValueChanged<bool> onEnter;
+  final bool demoEntry;
   @override
   State<Onboarding> createState() => _OnboardingState();
 }
@@ -138,8 +139,17 @@ class _OnboardingState extends State<Onboarding> {
                         ),
                         FilledButton(
                           onPressed: () => widget.onEnter(false),
-                          child: const Text('Continue to login'),
+                          child: Text(
+                            widget.demoEntry
+                                ? 'Start empty demo'
+                                : 'Continue to login',
+                          ),
                         ),
+                        if (widget.demoEntry)
+                          OutlinedButton(
+                            onPressed: () => widget.onEnter(true),
+                            child: const Text('Explore demo'),
+                          ),
                       ],
                     ]),
                   ),

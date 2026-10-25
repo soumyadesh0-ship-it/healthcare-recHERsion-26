@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 from google.genai import errors
 
-from service.main import ChatRequest, chat
+from service.main import _gemini_chat
 
 
 class ChatTests(unittest.IsolatedAsyncioTestCase):
@@ -25,7 +25,7 @@ class ChatTests(unittest.IsolatedAsyncioTestCase):
         self.client.return_value.aio.__aexit__ = AsyncMock(return_value=False)
 
     async def test_reply_and_client_cleanup(self):
-        result = await chat(ChatRequest(prompt='Hello'))
+        result = await _gemini_chat('Hello')
         self.assertEqual(result.response, 'Hello from AuraCare')
         self.ai.models.generate_content.assert_awaited_once()
         self.client.return_value.aio.__aexit__.assert_awaited_once()
@@ -36,7 +36,7 @@ class ChatTests(unittest.IsolatedAsyncioTestCase):
                 self.ai.models.generate_content.side_effect = errors.APIError(
                     upstream, {'error': {'message': 'private provider details'}})
                 with self.assertRaises(HTTPException) as caught:
-                    await chat(ChatRequest(prompt='Hello'))
+                    await _gemini_chat('Hello')
                 self.assertEqual(caught.exception.status_code, expected)
                 self.assertNotIn('private provider details', caught.exception.detail)
 
@@ -47,14 +47,14 @@ class ChatTests(unittest.IsolatedAsyncioTestCase):
         self.ai.models.generate_content.side_effect = stalled
         with patch('service.main.CHAT_TIMEOUT_SECONDS', 0.01):
             with self.assertRaises(HTTPException) as caught:
-                await chat(ChatRequest(prompt='Hello'))
+                await _gemini_chat('Hello')
         self.assertEqual(caught.exception.status_code, 504)
         self.client.return_value.aio.__aexit__.assert_awaited_once()
 
     async def test_missing_key_does_not_call_provider(self):
         with patch.dict('os.environ', {'GEMINI_API_KEY': ''}):
             with self.assertRaises(HTTPException) as caught:
-                await chat(ChatRequest(prompt='Hello'))
+                await _gemini_chat('Hello')
         self.assertEqual(caught.exception.status_code, 503)
         self.client.assert_not_called()
 

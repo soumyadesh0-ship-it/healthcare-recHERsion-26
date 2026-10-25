@@ -1,449 +1,433 @@
 import 'dart:async';
 
+import 'package:auracare_mobile_app/app/auth_root.dart';
+import 'package:auracare_mobile_app/app/session.dart';
+import 'package:auracare_mobile_app/app/controller_auth_service.dart';
+import 'package:auracare_mobile_app/data/api_client.dart';
+import 'package:auracare_mobile_app/data/auth_service.dart';
+import 'package:auracare_mobile_app/features/auth/auth_page.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:auracare_mobile_app/app/app.dart';
-import 'package:auracare_mobile_app/app/auth_service.dart';
-import 'package:auracare_mobile_app/app/setup_preference.dart';
-import 'package:auracare_mobile_app/app/theme.dart';
-import 'package:auracare_mobile_app/features/auth/auth.dart';
+import 'package:http/testing.dart';
+import 'package:http/http.dart' as http;
 
-class _TestAuthService implements AuthService {
-  final sessions = StreamController<AuthUser?>.broadcast();
-  final recoveries = StreamController<void>.broadcast();
-  bool configured = true;
-  bool verificationRequired = false;
-  AuthFailure? nextFailure;
-  AuthUser? user;
-
-  @override
-  bool get isConfigured => configured;
-
-  @override
-  bool get supportsGoogleSignIn => configured;
-
-  @override
-  Stream<AuthUser?> get sessionChanges => sessions.stream;
-
-  @override
-  Stream<void> get passwordRecoveryEvents => recoveries.stream;
-
-  @override
-  Future<AuthUser?> restoreSession() async => user;
-
-  @override
-  Future<AuthUser> signInWithPassword({
-    required String email,
-    required String password,
-  }) async {
-    if (nextFailure case final failure?) throw AuthException(failure);
-    return user = const AuthUser(
-      id: 'test-user',
-      email: 'alex@example.com',
-      displayName: 'Alex',
+final now = DateTime.utc(2026, 10, 25);
+UserSession syntheticSession({bool expired = false, bool verified = true}) =>
+    UserSession(
+      userId: 'synthetic-user',
+      token: 'synthetic-token',
+      expiresAt: now.add(Duration(minutes: expired ? -1 : 60)),
+      emailVerified: verified,
     );
+
+class FakeAuth implements AuthGateway {
+  @override
+  UserSession? session;
+  final events = StreamController<AuthUpdate>.broadcast(sync: true);
+  Object? failure;
+  Completer<void>? pending;
+  UserSession? signupSession;
+  int signups = 0;
+  int refreshes = 0, signOuts = 0, resets = 0, updates = 0, resends = 0;
+  @override
+  Stream<AuthUpdate> get changes => events.stream;
+  @override
+  Future<void> signIn(String email, String password) async {
+    if (pending != null) await pending!.future;
+    if (failure != null) throw failure!;
+    session = syntheticSession();
+    events.add(AuthUpdate(AuthEvent.signedIn, session));
   }
 
   @override
-  Future<AuthRegistrationResult> createAccount({
-    required String fullName,
-    required String email,
-    required String password,
+  Future<UserSession?> signUp(
+    String email,
+    String password, {
+    String? fullName,
   }) async {
-    if (nextFailure case final failure?) throw AuthException(failure);
-    return AuthRegistrationResult(
-      accountCreated: true,
-      emailVerificationRequired: verificationRequired,
-      user: verificationRequired ? null : AuthUser(id: 'created-user'),
-    );
+    signups++;
+    if (failure != null) throw failure!;
+    if (signupSession != null) session = signupSession;
+    return signupSession;
   }
 
   @override
-  Future<void> sendPasswordReset(String email) async {
-    if (nextFailure case final failure?) throw AuthException(failure);
+  Future<void> resendVerification(String email) async {
+    resends++;
   }
 
   @override
-  Future<AuthUser> updatePassword(String password) async =>
-      user ??= const AuthUser(id: 'password-updated-user');
+  Future<void> requestPasswordReset(String email) async {
+    resets++;
+  }
 
   @override
-  Future<AuthUser?> signInWithGoogle() async {
-    if (nextFailure case final failure?) throw AuthException(failure);
-    return const AuthUser(id: 'google-user');
+  Future<void> updatePassword(String password) async {
+    updates++;
   }
 
   @override
   Future<void> signOut() async {
-    user = null;
-    sessions.add(null);
+    signOuts++;
+    session = null;
+    events.add(const AuthUpdate(AuthEvent.signedOut, null));
   }
 
-  Future<void> dispose() async {
-    await sessions.close();
-    await recoveries.close();
+  @override
+  Future<UserSession?> refresh() async {
+    refreshes++;
+    if (failure != null) throw failure!;
+    session = syntheticSession();
+    events.add(AuthUpdate(AuthEvent.refreshed, session));
+    return session;
   }
 }
 
-Widget _page(AuthService auth) => MaterialApp(
-  theme: auracareTheme(),
-  home: LoginPage(auth: auth, onAuthenticated: (_) {}, onDemoSelected: (_) {}),
-);
-
-Widget _appPage(Widget child) =>
-    MaterialApp(theme: auracareTheme(), home: child);
-
 void main() {
-  testWidgets('login validates email and password and toggles visibility', (
-    tester,
-  ) async {
-    const auth = UnconfiguredAuthService();
-    await tester.pumpWidget(_page(auth));
-
-    await tester.tap(find.text('Log in'));
-    await tester.pumpAndSettle();
-    expect(find.text('Enter your email address.'), findsOneWidget);
-    expect(find.text('Enter your password.'), findsOneWidget);
-
-    await tester.enterText(find.byKey(const ValueKey('login-email')), 'bad');
-    await tester.enterText(
-      find.byKey(const ValueKey('login-password')),
-      'private-password',
-    );
-    await tester.tap(find.text('Log in'));
-    await tester.pumpAndSettle();
-    expect(find.text('Enter a valid email address.'), findsOneWidget);
-
-    final password = tester.widget<EditableText>(
-      find.descendant(
-        of: find.byKey(const ValueKey('login-password')),
-        matching: find.byType(EditableText),
-      ),
-    );
-    expect(password.obscureText, isTrue);
-    await tester.tap(find.byTooltip('Show password'));
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<EditableText>(
-            find.descendant(
-              of: find.byKey(const ValueKey('login-password')),
-              matching: find.byType(EditableText),
-            ),
-          )
-          .obscureText,
-      isFalse,
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('login-email')),
-      'person@example.com',
-    );
-    await tester.tap(find.text('Log in'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('not configured in this build'), findsOneWidget);
-    final googleButton = tester.widget<OutlinedButton>(
-      find.ancestor(
-        of: find.text('Continue with Google · unavailable'),
-        matching: find.byType(OutlinedButton),
-      ),
-    );
-    expect(googleButton.onPressed, isNull);
+  late FakeAuth gateway;
+  late AuraAuthController auth;
+  setUp(() {
+    gateway = FakeAuth();
+    auth = AuraAuthController(gateway: gateway, clock: () => now);
+  });
+  tearDown(() async {
+    auth.dispose();
+    await gateway.events.close();
   });
 
-  testWidgets('create account and password recovery routes work', (
+  test('successful sign in supplies current user bearer token', () async {
+    await auth.signIn('synthetic@example.com', 'password');
+    expect(auth.mode, AccessMode.authenticated);
+    expect(await auth.accessToken(), 'synthetic-token');
+  });
+  test(
+    'merged auth facade uses the API controller and requires verification',
+    () async {
+      final facade = ControllerAuthService(auth);
+      final registration = await facade.createAccount(
+        fullName: 'Synthetic Person',
+        email: 'synthetic@example.com',
+        password: 'password',
+      );
+      expect(registration.emailVerificationRequired, isTrue);
+      expect(await auth.accessToken(), isNull);
+      await facade.signInWithPassword(
+        email: 'synthetic@example.com',
+        password: 'password',
+      );
+      expect(await auth.accessToken(), 'synthetic-token');
+      expect(facade.supportsGoogleSignIn, isFalse);
+      await facade.signOut();
+      expect(await auth.accessToken(), isNull);
+    },
+  );
+  testWidgets('merged login screen enters canonical account session', (
     tester,
   ) async {
-    const auth = UnconfiguredAuthService();
-    await tester.pumpWidget(_page(auth));
-    await tester.ensureVisible(find.text('Create account'));
-    await tester.tap(find.text('Create account'));
+    await tester.pumpWidget(AuthenticationRoot(auth: auth));
     await tester.pumpAndSettle();
-    expect(find.text('Create your account'), findsOneWidget);
-
-    await tester.enterText(find.byKey(const ValueKey('create-name')), 'Alex');
     await tester.enterText(
-      find.byKey(const ValueKey('create-email')),
-      'alex@example.com',
+      find.byKey(const ValueKey('login-email')),
+      'synthetic@example.com',
     );
     await tester.enterText(
-      find.byKey(const ValueKey('create-password')),
-      '12345678',
+      find.byKey(const ValueKey('login-password')),
+      'password',
     );
-    await tester.enterText(
-      find.byKey(const ValueKey('create-confirm-password')),
-      'different',
-    );
-    await tester.ensureVisible(find.text('Create account'));
-    await tester.tap(find.text('Create account'));
-    await tester.pumpAndSettle();
-    expect(find.text('Passwords do not match.'), findsOneWidget);
     await tester.ensureVisible(find.text('Log in'));
     await tester.tap(find.text('Log in'));
     await tester.pumpAndSettle();
-
-    await tester.ensureVisible(find.text('Forgot password?'));
-    await tester.tap(find.text('Forgot password?'));
-    await tester.pumpAndSettle();
-    expect(find.text('Reset your password'), findsOneWidget);
-    await tester.enterText(
-      find.byKey(const ValueKey('reset-email')),
-      'alex@example.com',
+    expect(auth.mode, AccessMode.authenticated);
+    expect(await auth.accessToken(), 'synthetic-token');
+    expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
+    expect(
+      tester
+          .widget<SessionScope>(find.byType(SessionScope))
+          .notifier!
+          .quizService,
+      isNotNull,
     );
-    await tester.tap(find.text('Send reset link'));
+    await tester.tap(find.byKey(const ValueKey('auth-exit')));
+    await tester.pumpAndSettle();
+    expect(auth.mode, AccessMode.signedOut);
+    expect(find.byKey(const ValueKey('login-email')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets('token refresh preserves the authenticated session records', (
+    tester,
+  ) async {
+    await auth.signIn('synthetic@example.com', 'password');
+    await tester.pumpWidget(AuthenticationRoot(auth: auth));
+    await tester.pumpAndSettle();
+    final session = tester
+        .widget<SessionScope>(find.byType(SessionScope))
+        .notifier!;
+    session.addQuestion('Synthetic account question');
+    await gateway.refresh();
     await tester.pumpAndSettle();
     expect(
-      find.textContaining('unavailable until the shared authentication'),
-      findsOneWidget,
+      tester.widget<SessionScope>(find.byType(SessionScope)).notifier,
+      same(session),
     );
-    await tester.ensureVisible(find.text('Back to login'));
-    await tester.tap(find.text('Back to login'));
-    await tester.pumpAndSettle();
-    expect(find.text('Welcome to AuraCare'), findsOneWidget);
+    expect(session.questions, ['Synthetic account question']);
+    await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('registration only reports provider-confirmed success', (
-    tester,
-  ) async {
-    final auth = _TestAuthService();
-    addTearDown(auth.dispose);
-    var authenticated = false;
-    await tester.pumpWidget(
-      _appPage(
-        CreateAccountPage(
-          auth: auth,
-          onAuthenticated: (_) => authenticated = true,
-        ),
-      ),
-    );
-    await tester.enterText(find.byKey(const ValueKey('create-name')), 'Alex');
-    await tester.enterText(
-      find.byKey(const ValueKey('create-email')),
-      'alex@example.com',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('create-password')),
-      'secure-pass',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('create-confirm-password')),
-      'secure-pass',
-    );
-    await tester.ensureVisible(find.text('Create account'));
-    await tester.tap(find.text('Create account'));
-    await tester.pumpAndSettle();
-    expect(authenticated, isTrue);
+  test('signup confirmation never reuses an unrelated SDK session', () async {
+    gateway.session = syntheticSession();
+    await auth.signUp('new-synthetic@example.com', 'password');
+    expect(gateway.signups, 1);
+    expect(auth.mode, AccessMode.signedOut);
+    expect(await auth.accessToken(), isNull);
+    expect(auth.message, contains('verification email'));
   });
-
-  testWidgets('registration waits for email verification before app access', (
-    tester,
-  ) async {
-    final auth = _TestAuthService()..verificationRequired = true;
-    addTearDown(auth.dispose);
-    var authenticated = false;
-    await tester.pumpWidget(
-      _appPage(
-        CreateAccountPage(
-          auth: auth,
-          onAuthenticated: (_) => authenticated = true,
-        ),
-      ),
-    );
-    await tester.enterText(find.byKey(const ValueKey('create-name')), 'Alex');
-    await tester.enterText(
-      find.byKey(const ValueKey('create-email')),
-      'alex@example.com',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('create-password')),
-      'secure-pass',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('create-confirm-password')),
-      'secure-pass',
-    );
-    await tester.ensureVisible(find.text('Create account'));
-    await tester.tap(find.text('Create account'));
-    await tester.pumpAndSettle();
-
-    expect(authenticated, isFalse);
-    expect(find.textContaining('verification instructions'), findsOneWidget);
+  test('signup can accept its own verified session', () async {
+    gateway.signupSession = syntheticSession();
+    await auth.signUp('synthetic@example.com', 'password');
+    expect(auth.mode, AccessMode.authenticated);
+    expect(await auth.accessToken(), 'synthetic-token');
   });
-
-  testWidgets(
-    'app opens login after onboarding and returns to home only on auth',
-    (tester) async {
-      var setupComplete = true;
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SetupPreference.channel, (call) async {
-            if (call.method == 'completed') return setupComplete;
-            if (call.method == 'complete') {
-              setupComplete = true;
-              return true;
-            }
-            throw PlatformException(code: 'unsupported');
-          });
-      addTearDown(() {
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(SetupPreference.channel, null);
+  test('signup failure is sanitized and grants no access', () async {
+    gateway.failure = StateError('internal signup secret');
+    await auth.signUp('synthetic@example.com', 'password');
+    expect(auth.mode, AccessMode.signedOut);
+    expect(auth.error, const AuthFailure(AuthProblem.unavailable).message);
+    expect(await auth.accessToken(), isNull);
+  });
+  test('empty initial session still accepts later confirmation', () async {
+    gateway.events.add(const AuthUpdate(AuthEvent.restored, null));
+    expect(auth.error, isNull);
+    gateway.session = syntheticSession();
+    gateway.events.add(AuthUpdate(AuthEvent.signedIn, gateway.session));
+    expect(auth.mode, AccessMode.authenticated);
+  });
+  test(
+    'API uses refreshed controller token and stops sending after logout',
+    () async {
+      await auth.signIn('synthetic@example.com', 'password');
+      gateway.session = syntheticSession(expired: true);
+      var sends = 0;
+      final transport = MockClient((request) async {
+        sends++;
+        expect(request.headers['Authorization'], 'Bearer synthetic-token');
+        return http.Response('{"response":"Synthetic response"}', 200);
       });
-      final auth = _TestAuthService();
-      addTearDown(auth.dispose);
-      await tester.pumpWidget(AuracareApp(authService: auth));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Continue'));
-      await tester.tap(find.text('Continue'));
-      await tester.pumpAndSettle();
-      expect(find.text('Welcome to AuraCare'), findsOneWidget);
-
-      await tester.enterText(
-        find.byKey(const ValueKey('login-email')),
-        'alex@example.com',
+      final api = AuraApiClient(
+        config: ApiConfig(baseUrl: 'https://example.com'),
+        tokenProvider: auth,
+        httpClient: transport,
       );
-      await tester.enterText(
-        find.byKey(const ValueKey('login-password')),
-        'correct-horse',
-      );
-      await tester.tap(find.text('Log in'));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('open-drawer')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Profile'));
-      await tester.pumpAndSettle();
-      expect(find.text('Signed in as alex@example.com'), findsOneWidget);
+      addTearDown(() {
+        api.close();
+        transport.close();
+      });
       expect(
-        find.textContaining('are not uploaded to your account'),
-        findsOneWidget,
+        await api.chat(prompt: 'synthetic', aiProcessingConfirmed: true),
+        'Synthetic response',
       );
-      await tester.scrollUntilVisible(
-        find.text('Sign out / exit demo'),
-        240,
-        scrollable: find.byType(Scrollable).last,
+      expect(gateway.refreshes, 1);
+      await auth.signOut();
+      await expectLater(
+        api.chat(prompt: 'synthetic', aiProcessingConfirmed: true),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.failure,
+            'failure',
+            ApiFailure.unauthenticated,
+          ),
+        ),
       );
-      await tester.tap(find.text('Sign out / exit demo'));
-      await tester.pumpAndSettle();
-      expect(find.text('Welcome to AuraCare'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox.shrink());
+      expect(sends, 1);
     },
   );
-
-  testWidgets('restored authenticated session skips login', (tester) async {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SetupPreference.channel, (call) async {
-          if (call.method == 'completed') return true;
-          throw PlatformException(code: 'unsupported');
-        });
-    addTearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SetupPreference.channel, null);
-    });
-    final auth = _TestAuthService()..user = const AuthUser(id: 'restored-user');
-    addTearDown(auth.dispose);
-
-    await tester.pumpWidget(AuracareApp(authService: auth));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Continue'));
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Image &&
-            widget.image is AssetImage &&
-            (widget.image as AssetImage).assetName ==
-                'assets/brand/auracare-icon.png',
-      ),
-      findsOneWidget,
-    );
-    await tester.pumpWidget(const SizedBox.shrink());
+  test('invalid credentials show fixed safe message', () async {
+    gateway.failure = const AuthFailure(AuthProblem.invalidCredentials);
+    await auth.signIn('synthetic@example.com', 'wrong');
+    expect(auth.mode, AccessMode.signedOut);
+    expect(auth.error, contains('Check your email and password'));
+    expect(await auth.accessToken(), isNull);
   });
-
-  testWidgets('verified recovery link requires a new password', (tester) async {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SetupPreference.channel, (call) async {
-          if (call.method == 'completed') return true;
-          throw PlatformException(code: 'unsupported');
-        });
-    addTearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SetupPreference.channel, null);
-    });
-    final auth = _TestAuthService()
-      ..user = const AuthUser(id: 'recovery-user', email: 'alex@example.com');
-    addTearDown(auth.dispose);
-
-    await tester.pumpWidget(AuracareApp(authService: auth));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Continue'));
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
-    auth.recoveries.add(null);
-    await tester.pumpAndSettle();
-    expect(find.text('Choose a new password'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const ValueKey('recovery-password')),
-      'a-new-private-password',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('recovery-confirm-password')),
-      'a-new-private-password',
-    );
-    await tester.ensureVisible(find.text('Update password'));
-    await tester.tap(find.text('Update password'));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('tab-Home')), findsOneWidget);
-    await tester.pumpWidget(const SizedBox.shrink());
+  test('sign out revokes access immediately', () async {
+    await auth.signIn('synthetic@example.com', 'password');
+    await auth.signOut();
+    expect(gateway.signOuts, 1);
+    expect(auth.mode, AccessMode.signedOut);
+    expect(await auth.accessToken(), isNull);
   });
-
-  for (final width in [320.0, 360.0, 390.0, 430.0]) {
-    for (final scale in [1.0, 2.0]) {
-      testWidgets('auth page fits ${width}dp at ${scale}x text', (
-        tester,
-      ) async {
-        tester.view.physicalSize = Size(width, 844);
-        tester.view.devicePixelRatio = 1;
-        tester.view.viewInsets = const FakeViewPadding(bottom: 280);
-        tester.platformDispatcher.textScaleFactorTestValue = scale;
-        addTearDown(() {
-          tester.view.resetPhysicalSize();
-          tester.view.resetDevicePixelRatio();
-          tester.view.resetViewInsets();
-          tester.platformDispatcher.clearTextScaleFactorTestValue();
-        });
-        await tester.pumpWidget(_page(const UnconfiguredAuthService()));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-        await tester.enterText(
-          find.byKey(const ValueKey('login-email')),
-          'person@example.com',
-        );
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Log in'));
-        expect(tester.takeException(), isNull);
-
-        await tester.pumpWidget(
-          _appPage(
-            CreateAccountPage(
-              auth: const UnconfiguredAuthService(),
-              onAuthenticated: (_) {},
+  test('expired session refresh is coalesced for concurrent callers', () async {
+    await auth.signIn('synthetic@example.com', 'password');
+    gateway.session = syntheticSession(expired: true);
+    expect(await Future.wait([auth.accessToken(), auth.accessToken()]), [
+      'synthetic-token',
+      'synthetic-token',
+    ]);
+    expect(gateway.refreshes, 1);
+  });
+  test('failed refresh expires access without exposing SDK error', () async {
+    await auth.signIn('synthetic@example.com', 'password');
+    gateway.session = syntheticSession(expired: true);
+    gateway.failure = StateError('secret-internal-token');
+    expect(await auth.accessToken(), isNull);
+    expect(auth.mode, AccessMode.signedOut);
+    expect(auth.error, isNot(contains('secret')));
+  });
+  test('restored session refreshes before protected access', () async {
+    auth.dispose();
+    gateway.session = syntheticSession(expired: true);
+    auth = AuraAuthController(gateway: gateway, clock: () => now);
+    expect(auth.mode, AccessMode.authenticated);
+    expect(await auth.accessToken(), 'synthetic-token');
+    expect(gateway.refreshes, 1);
+  });
+  test('unverified restoration grants no access', () async {
+    gateway.events.add(
+      AuthUpdate(AuthEvent.restored, syntheticSession(verified: false)),
+    );
+    expect(auth.mode, AccessMode.signedOut);
+    expect(await auth.accessToken(), isNull);
+  });
+  test('demo ignores restored, refreshed and recovery sessions', () async {
+    auth.enterDemo();
+    gateway.session = syntheticSession();
+    for (final event in AuthEvent.values) {
+      gateway.events.add(AuthUpdate(event, gateway.session));
+      expect(auth.mode, AccessMode.demo);
+      expect(await auth.accessToken(), isNull);
+    }
+    auth.leaveDemo();
+    expect(await auth.accessToken(), isNull);
+  });
+  test(
+    'unauthenticated and demo protected requests never reach transport',
+    () async {
+      var sent = 0;
+      final http = MockClient((request) async {
+        sent++;
+        throw StateError('sent');
+      });
+      final api = AuraApiClient(
+        config: ApiConfig(baseUrl: 'https://example.com'),
+        tokenProvider: auth,
+        httpClient: http,
+      );
+      addTearDown(() {
+        api.close();
+        http.close();
+      });
+      for (final demo in [false, true]) {
+        if (demo) auth.enterDemo();
+        await expectLater(
+          api.chat(prompt: 'synthetic', aiProcessingConfirmed: true),
+          throwsA(
+            isA<ApiException>().having(
+              (e) => e.failure,
+              'failure',
+              ApiFailure.unauthenticated,
             ),
           ),
         );
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-
-        await tester.pumpWidget(
-          _appPage(ResetPasswordPage(auth: const UnconfiguredAuthService())),
-        );
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-      });
+      }
+      expect(sent, 0);
+    },
+  );
+  test(
+    'signup waits for verification and reset uses recovery with no token',
+    () async {
+      await auth.signUp('synthetic@example.com', 'password');
+      expect(auth.mode, AccessMode.signedOut);
+      expect(auth.message, contains('verification email'));
+      await auth.requestPasswordReset('synthetic@example.com');
+      expect(gateway.resets, 1);
+      gateway.session = syntheticSession();
+      gateway.events.add(AuthUpdate(AuthEvent.recovery, gateway.session));
+      expect(auth.mode, AccessMode.recovery);
+      expect(await auth.accessToken(), isNull);
+      await auth.updatePassword('new-password');
+      expect(gateway.updates, 1);
+      expect(auth.mode, AccessMode.signedOut);
+    },
+  );
+  test('timed out sign in cannot grant late access', () async {
+    auth.dispose();
+    auth = AuraAuthController(
+      gateway: gateway,
+      clock: () => now,
+      operationTimeout: const Duration(milliseconds: 1),
+    );
+    gateway.pending = Completer<void>();
+    await auth.signIn('synthetic@example.com', 'password');
+    gateway.pending!.complete();
+    await Future<void>.delayed(Duration.zero);
+    expect(auth.mode, AccessMode.signedOut);
+    expect(await auth.accessToken(), isNull);
+  });
+  test('configuration rejects privileged and missing keys', () {
+    for (final key in ['', 'sb_secret_synthetic', 'service_role']) {
+      expect(
+        () => SupabaseConfiguration(
+          url: 'https://example.supabase.co',
+          anonKey: key,
+        ),
+        throwsA(isA<AuthFailure>()),
+      );
     }
-  }
+  });
+  testWidgets('login validates, shows loading and sanitized failure', (
+    tester,
+  ) async {
+    gateway.pending = Completer<void>();
+    gateway.failure = StateError('internal secret');
+    await tester.pumpWidget(MaterialApp(home: AuthPage(auth: auth)));
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+    await tester.tap(find.byKey(const ValueKey('auth-submit')));
+    await tester.pump();
+    expect(find.text('Enter a valid email address.'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-email')),
+      'synthetic@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('auth-password')),
+      'password',
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+    await tester.tap(find.byKey(const ValueKey('auth-submit')));
+    await tester.pump();
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('auth-submit')))
+          .onPressed,
+      isNull,
+    );
+    gateway.pending!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('auth-error')), findsOneWidget);
+    expect(find.textContaining('internal secret'), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
+  testWidgets('demo records are discarded at the account entry boundary', (
+    tester,
+  ) async {
+    await tester.pumpWidget(AuthenticationRoot(auth: auth));
+    auth.enterDemo();
+    await tester.pumpAndSettle();
+    final demo = tester
+        .widget<SessionScope>(find.byType(SessionScope))
+        .notifier!;
+    demo.addQuestion('Synthetic demo-only question');
+    auth.leaveDemo();
+    await tester.pumpAndSettle();
+    await auth.signIn('synthetic@example.com', 'password');
+    await tester.pumpAndSettle();
+    final account = tester
+        .widget<SessionScope>(find.byType(SessionScope))
+        .notifier!;
+    expect(identical(demo, account), isFalse);
+    expect(account.questions, isEmpty);
+    expect(account.records.entries, isEmpty);
+    expect(find.text('Sign out'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

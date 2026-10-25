@@ -38,7 +38,7 @@ void main() {
       expect(summary, contains('Fatigue'));
       expect(summary, contains('v2'));
       expect(summary, isNot(contains('Headache')));
-      await repo.delete('fixture');
+      await repo.delete('fixture', expectedVersion: 2);
       expect(Coverage(repo.entries, from, to).recordedDays, 0);
       expect(changes, 3);
       repo.dispose();

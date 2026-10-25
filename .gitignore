@@ -1,3 +1,9 @@
+# Local environment configuration (at any directory depth).
+# Ignore rules do not remove files already tracked by Git.
+.env
+.env.*
+!.env.example
+
 # Flutter and Android build output (including nested Flutter applications)
 **/build/
 **/.dart_tool/

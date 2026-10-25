@@ -5,6 +5,7 @@ import '../../app/theme.dart';
 import '../../app/quiz_integration.dart';
 import 'flashcard.dart';
 import 'model_result.dart';
+import 'survey_quiz.dart';
 import '../../core/widgets.dart';
 import '../../data/services.dart';
 import '../../data/model_quiz_service.dart';
@@ -241,6 +242,7 @@ class _QuizPageState extends State<QuizPage> {
           ModelQuizStatus.tracking => 'Continue with your history',
         }
       : switch (outcome!) {
+          QuizOutcome.summary => 'Reported symptom summary',
           QuizOutcome.fixture => 'A summary, not a diagnosis.',
           QuizOutcome.unavailable => 'Live assessment unavailable',
           QuizOutcome.failure => 'Demo service failed',
@@ -260,6 +262,8 @@ class _QuizPageState extends State<QuizPage> {
           ModelQuizStatus.tracking => 'A reported known diagnosis routes to tracking and consultation preparation without rescoring.',
         }
       : switch (outcome!) {
+          QuizOutcome.summary =>
+            'A descriptive count of reported symptoms, not a diagnosis.',
           QuizOutcome.fixture => 'Labeled demonstration fixture. No model was run and this is not a personal result. No risk band or probability is displayed.',
           QuizOutcome.unavailable => 'No verified model service or endpoint is connected. Your answers remain available to edit or copy.',
           QuizOutcome.failure => 'Simulated failure. Your answers are preserved. Retry uses the demonstration fixture, not a model.',
@@ -269,6 +273,10 @@ class _QuizPageState extends State<QuizPage> {
         };
   @override
   Widget build(BuildContext context) {
+    if (SessionScope.of(context).quizService != null &&
+        QuizIntegrationScope.maybeOf(context)?.service == null) {
+      return SurveyQuizPage(embedded: widget.embedded);
+    }
     final screen = '$step-$busy-${outcome?.name}';
     if (visibleScreen != screen) {
       visibleScreen = screen;

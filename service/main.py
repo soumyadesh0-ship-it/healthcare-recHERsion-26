@@ -2,10 +2,14 @@
 
 import asyncio
 import json
+from pathlib import Path
 import os
+import math
+import time
+from dataclasses import dataclass
+from threading import Lock
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -14,24 +18,56 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from openai import OpenAI, APIConnectionError, APIError, APIStatusError
+import httpx
 from google import genai
 from google.genai import errors, types
-from httpx import HTTPError, TimeoutException
-from postgrest.exceptions import APIError
+from httpx import TimeoutException
+from service import pcos_model
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
 from supabase import ClientOptions, create_client
-from supabase_auth.errors import AuthApiError, AuthRetryableError
-
-from service import pcos_model
+from supabase_auth.errors import AuthApiError
 
 load_dotenv(Path(__file__).resolve().parent.parent / '.env.local')
 load_dotenv()
 
 
 METHOD_VERSION = "survey-count-v1"
+SUPABASE_TIMEOUT_SECONDS = 10
+OPENAI_TIMEOUT_SECONDS = 30
 CHAT_TIMEOUT_SECONDS = 25
+
+
+class ChatRateLimiter:
+    """Bounded fixed-window limiter for one local process, not production clusters."""
+
+    def __init__(self, limit=10, window_seconds=60, max_users=1024, clock=time.monotonic):
+        self.limit = limit
+        self.window_seconds = window_seconds
+        self.max_users = max_users
+        self.clock = clock
+        self._users = {}
+        self._lock = Lock()
+
+    def check(self, user_id: str):
+        with self._lock:
+            now = self.clock()
+            self._users = {key: value for key, value in self._users.items() if value[0] > now}
+            current = self._users.get(user_id)
+            if current is None:
+                if len(self._users) >= self.max_users:
+                    retry = max(1, math.ceil(min(v[0] for v in self._users.values()) - now))
+                    raise HTTPException(503, "Chat is temporarily unavailable.", headers={"Retry-After": str(retry)})
+                current = (now + self.window_seconds, 0)
+            expiry, count = current
+            if count >= self.limit:
+                raise HTTPException(429, "Chat rate limit exceeded. Please try again later.",
+                    headers={"Retry-After": str(max(1, math.ceil(expiry - now)))})
+            self._users[user_id] = (expiry, count + 1)
+
+
 CHAT_SYSTEM_INSTRUCTION = """
-You are AuraCare, an AI assistant providing helpful, respectful general health
+You are AuraCare, an AI assistant providing supportive, empathetic, respectful general health
 and wellness information. Clearly identify yourself as an AI assistant, not a
 doctor. Explain uncertainty and limitations in plain language. Explicitly advise
 users to consult a certified doctor for formal diagnoses, treatment decisions,
@@ -59,11 +95,10 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be configured.")
     app.state.supabase_url = url
     app.state.supabase_key = key
+    app.state.chat_limiter = ChatRateLimiter()
     try:
         app.state.pcos_model = pcos_model.load_model()
     except Exception:
-        # A missing/incompatible artifact must not disable existing endpoints.
-        # Never return deserialization errors or local paths to API callers.
         app.state.pcos_model = None
     yield
 
@@ -130,10 +165,54 @@ class ChatRequest(BaseModel):
     prompt: Annotated[
         str, StringConstraints(strict=True, strip_whitespace=True, min_length=1, max_length=10000)
     ]
+    ai_processing_confirmed: StrictBool
 
 
 class ChatResponse(BaseModel):
     response: str
+
+
+@dataclass(frozen=True)
+class AuthenticatedUser:
+    user_id: str
+    client: object
+
+
+def authenticated_user(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+):
+    if credentials is None:
+        raise HTTPException(401, "A Supabase access token is required.", headers={"WWW-Authenticate": "Bearer"})
+    # A fresh, explicitly bounded transport and SDK client for every request.
+    # Closing the transport also releases auth/PostgREST connection resources.
+    with httpx.Client(timeout=SUPABASE_TIMEOUT_SECONDS) as transport:
+        try:
+            client = create_client(
+                request.app.state.supabase_url,
+                request.app.state.supabase_key,
+                options=ClientOptions(persist_session=False, auto_refresh_token=False,
+                    httpx_client=transport, postgrest_client_timeout=SUPABASE_TIMEOUT_SECONDS),
+            )
+            auth = client.auth.get_user(credentials.credentials)
+        except AuthApiError as exc:
+            if exc.status >= 500 or exc.status == 429:
+                raise HTTPException(503, "Authentication is temporarily unavailable.") from None
+            raise HTTPException(401, "Invalid or expired access token.", headers={"WWW-Authenticate": "Bearer"}) from None
+        except Exception:
+            raise HTTPException(503, "Authentication is temporarily unavailable.") from None
+        if auth is None or auth.user is None:
+            raise HTTPException(401, "Invalid or expired access token.", headers={"WWW-Authenticate": "Bearer"})
+        try:
+            if auth.user.id is None:
+                raise ValueError("Missing user identity")
+            user_id = str(auth.user.id)
+            if not user_id:
+                raise ValueError("Missing user identity")
+            client.postgrest.auth(credentials.credentials)
+        except Exception:
+            raise HTTPException(503, "Authentication is temporarily unavailable.") from None
+        yield AuthenticatedUser(user_id=user_id, client=client)
 
 
 @app.exception_handler(RequestValidationError)
@@ -153,8 +232,13 @@ async def private_responses(request: Request, call_next):
     return response
 
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat(message: ChatRequest):
+@app.exception_handler(Exception)
+async def internal_error(request: Request, exc: Exception):
+    return JSONResponse(status_code=500, content={"detail": "Internal server error."},
+        headers={"Cache-Control": "no-store"})
+
+
+async def _gemini_chat(prompt: str):
     key = os.getenv('GEMINI_API_KEY', '').strip()
     if not key:
         raise HTTPException(503, 'The assistant is not configured on the backend.')
@@ -170,7 +254,7 @@ async def chat(message: ChatRequest):
             result = await asyncio.wait_for(
                 ai.models.generate_content(
                     model="gemini-3.8-flash",
-                    contents=message.prompt,
+                    contents=prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=CHAT_SYSTEM_INSTRUCTION,
                         max_output_tokens=2048,
@@ -196,29 +280,44 @@ async def chat(message: ChatRequest):
     return ChatResponse(response=text.strip())
 
 
-def authenticated_client(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials | None,
-):
-    if credentials is None:
-        raise HTTPException(401, "A Supabase access token is required.", headers={"WWW-Authenticate": "Bearer"})
-
-    # Never mutate a shared client's auth state across concurrent users.
-    client = create_client(
-        request.app.state.supabase_url,
-        request.app.state.supabase_key,
-        options=ClientOptions(persist_session=False, auto_refresh_token=False),
-    )
-    token = credentials.credentials
+@app.post("/chat", response_model=ChatResponse)
+def chat(message: ChatRequest, request: Request,
+    user: Annotated[AuthenticatedUser, Depends(authenticated_user)]):
+    if not message.ai_processing_confirmed:
+        raise HTTPException(403, "Confirm sending this prompt to the AI service before continuing.")
+    if os.getenv("GEMINI_API_KEY", "").strip():
+        request.app.state.chat_limiter.check(user.user_id)
+        return asyncio.run(_gemini_chat(message.prompt))
+    key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not key:
+        raise HTTPException(503, "The AI service is temporarily unavailable.")
+    request.app.state.chat_limiter.check(user.user_id)
     try:
-        auth = client.auth.get_user(token)
-    except AuthApiError:
-        raise HTTPException(401, "Invalid or expired access token.", headers={"WWW-Authenticate": "Bearer"}) from None
-    except (HTTPError, AuthRetryableError):
-        raise HTTPException(503, "Authentication is temporarily unavailable.") from None
-    if auth is None or auth.user is None:
-        raise HTTPException(401, "Invalid or expired access token.")
-    return client, auth
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"),
+            timeout=OPENAI_TIMEOUT_SECONDS, max_retries=0)
+        with client:
+            result = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": CHAT_SYSTEM_INSTRUCTION},
+                    {"role": "user", "content": message.prompt},
+                ],
+                max_completion_tokens=2048,
+            )
+            text = result.choices[0].message.content if result.choices else None
+    except (APIConnectionError, httpx.TimeoutException, httpx.NetworkError):
+        raise HTTPException(503, "The AI service is temporarily unavailable.") from None
+    except APIStatusError as exc:
+        status = 503 if exc.status_code == 429 or exc.status_code >= 500 else 502
+        raise HTTPException(status, "The AI service could not complete the request.") from None
+    except APIError:
+        raise HTTPException(502, "The AI service could not complete the request.") from None
+    except Exception:
+        raise HTTPException(502, "The AI service could not complete the request.") from None
+    if not isinstance(text, str) or not text.strip():
+        raise HTTPException(502, "The AI did not return a text response. Please rephrase your question.")
+    return ChatResponse(response=text.strip())
+
 
 
 @app.post('/pcos/model-assessment', response_model=ModelQuizResult,
@@ -226,9 +325,8 @@ def authenticated_client(
 def model_assessment(
     answers: ModelQuizData,
     request: Request,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
 ):
-    authenticated_client(request, credentials)
     try:
         return pcos_model.assess(answers.model_dump(), request.app.state.pcos_model)
     except ValueError:
@@ -236,17 +334,11 @@ def model_assessment(
     except Exception:
         raise HTTPException(503, 'The experimental model is temporarily unavailable. Your answers can be retried.') from None
 
-
 @app.post("/predict-pcos", response_model=Prediction, status_code=201)
 def predict_pcos(
     survey: SurveyData,
-    request: Request,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    user: Annotated[AuthenticatedUser, Depends(authenticated_user)],
 ):
-    client, auth = authenticated_client(request, credentials)
-    token = credentials.credentials
-    client.postgrest.auth(token)
-
     answers = survey.model_dump()
     answered = sum(value is not None for value in answers.values())
     if not answered:
@@ -263,16 +355,19 @@ def predict_pcos(
         "limitations": LIMITATIONS,
     }
     try:
-        result = client.table("pcos_assessments").insert({
-            "user_id": str(auth.user.id),
+        result = user.client.table("pcos_assessments").insert({
+            "user_id": user.user_id,
             "assessment_date": datetime.now(timezone.utc).date().isoformat(),
             "status": "draft",
             "observations": json.dumps({"survey": answers, "summary": summary}),
             "limitations": LIMITATIONS,
             "method_version": METHOD_VERSION,
         }).execute()
-    except (APIError, HTTPError):
+        if not result.data:
+            raise HTTPException(503, "Assessment could not be saved.")
+        prediction = Prediction(assessment_id=result.data[0]["id"], **summary)
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(503, "Assessment could not be saved. Please try again.") from None
-    if not result.data:
-        raise HTTPException(503, "Assessment could not be saved.")
-    return Prediction(assessment_id=result.data[0]["id"], **summary)
+    return prediction
